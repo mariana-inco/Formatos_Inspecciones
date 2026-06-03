@@ -4,7 +4,7 @@ import React, { useMemo, useRef, useState } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import { inspectionTypes, inspectionTypeKeys, decisionOptions } from "./data";
-import type { InspectionTypeKey } from "./data";
+import type { ChecklistItem, InspectionTypeKey } from "./data";
 
 const initialGeneralData = {
   email: "",
@@ -38,6 +38,11 @@ const selectClassName =
 const requiredMark = <span className="text-red-600">*</span>;
 
 type ConceptoRevision = "" | "ACEPTADO" | "RECHAZADO";
+
+type ChecklistResponse = {
+  concepto: ConceptoRevision;
+  comentario: string;
+};
 
 type SignatureData = {
   inspectorIdentificacion: string;
@@ -92,7 +97,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [selectedType, setSelectedType] = useState(inspectionTypeKeys[0]);
   const [decisionFinal, setDecisionFinal] = useState("");
   const [comentariosFinales, setComentariosFinales] = useState("");
-  const [checklistResponses, setChecklistResponses] = useState<Record<string, { concepto: ConceptoRevision; comentario: string }>>({});
+  const [checklistResponses, setChecklistResponses] = useState<Record<string, ChecklistResponse>>({});
+  const [mostrarDatosAdicionales, setMostrarDatosAdicionales] = useState(false);
   const [signatureModalRole, setSignatureModalRole] = useState<"inspector" | "responsable" | null>(null);
   const [signatureHasStroke, setSignatureHasStroke] = useState(false);
   const signatureRef = useRef<SignatureRef>(null);
@@ -110,6 +116,10 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   });
 
   const currentChecklist = useMemo(() => inspectionTypes[selectedType].checklist || [], [selectedType]);
+  const primeraTablaCompleta = useMemo(
+    () => currentChecklist.length > 0 && currentChecklist.every((item) => Boolean(checklistResponses[item.key]?.concepto)),
+    [currentChecklist, checklistResponses]
+  );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target as HTMLInputElement;
@@ -163,22 +173,21 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     }));
   };
 
-  const applyConceptToChecklist = (concepto: ConceptoRevision) => {
-    setChecklistResponses((prev) =>
-      currentChecklist.reduce<Record<string, { concepto: ConceptoRevision; comentario: string }>>((next, item) => {
-        next[item.key] = { concepto, comentario: prev[item.key]?.comentario || "" };
-        return next;
-      }, {})
-    );
-    if (concepto === "ACEPTADO") setDecisionFinal("apto");
-    if (concepto === "RECHAZADO") setDecisionFinal("no-apto");
-  };
-
   const handleInspectionTypeSelect = (type: InspectionTypeKey) => {
     setSelectedType(type);
     setChecklistResponses({});
+    setMostrarDatosAdicionales(false);
     setComentariosFinales("");
     setDecisionFinal("");
+  };
+
+  const handleAgregarDatosAdicionales = () => {
+    if (!primeraTablaCompleta) {
+      alert("Complete la columna CONCEPTO de la primera tabla antes de agregar datos.");
+      return;
+    }
+
+    setMostrarDatosAdicionales(true);
   };
 
   const handleOpenSignatureModal = (role: "inspector" | "responsable") => {
@@ -228,6 +237,15 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
         concepto: checklistResponses[item.key]?.concepto || "",
         comentario: checklistResponses[item.key]?.comentario || "",
       })),
+      datosAdicionalesChecklist: mostrarDatosAdicionales
+        ? currentChecklist.map((item) => ({
+            key: item.key,
+            factor: item.factor,
+            instrucciones: item.instrucciones,
+            concepto: checklistResponses[item.key]?.concepto || "",
+            detalleApoyo: checklistResponses[item.key]?.comentario || "",
+          }))
+        : [],
       cierreInspeccion: {
         comentariosFinales,
         decisionFinal,
@@ -260,6 +278,82 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
+
+  const renderChecklistTable = (options: {
+    items: ChecklistItem[];
+    mode: "principal" | "adicional";
+    detailTitle: string;
+  }) => (
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200 text-sm">
+        <colgroup>
+          <col className="w-[52%]" />
+          <col className="w-[18%]" />
+          <col className="w-[30%]" />
+        </colgroup>
+        <thead className="bg-emerald-900 text-left text-white">
+          <tr>
+            <th className="px-4 py-4">FACTORES GENERALES</th>
+            <th className="px-6 py-4 text-center">CONCEPTO</th>
+            <th className="px-4 py-4">{options.detailTitle}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200 bg-slate-50">
+          {options.items.map((item) => {
+            const concepto = checklistResponses[item.key]?.concepto || "";
+
+            return (
+              <tr key={`${options.mode}-${item.key}`} className="border-b border-slate-200">
+                <td className="px-4 py-3 align-top">
+                  <div className="text-xs font-semibold text-slate-950">{item.factor}</div>
+                  {Array.isArray(item.instrucciones) ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-800">
+                      {item.instrucciones.map((instruccion) => (
+                        <li key={instruccion}>{instruccion}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-xs leading-5 text-slate-800">{item.instrucciones}</p>
+                  )}
+                </td>
+                <td className="px-4 py-3 align-top">
+                  {options.mode === "principal" ? (
+                    <select
+                      value={concepto}
+                      onChange={(e) => handleChecklistConceptChange(item.key, e.target.value as ConceptoRevision)}
+                      className="mx-auto block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    >
+                      <option value="">--Seleccione--</option>
+                      <option value="ACEPTADO">ACEPTADO</option>
+                      <option value="RECHAZADO">RECHAZADO</option>
+                    </select>
+                  ) : (
+                    <div className="mx-auto flex h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm">
+                      {concepto || "-"}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3 align-top">
+                  {options.mode === "principal" ? (
+                    <input
+                      value={checklistResponses[item.key]?.comentario || ""}
+                      onChange={(e) => handleChecklistCommentChange(item.key, e.target.value)}
+                      className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      placeholder="Solo si aplica"
+                    />
+                  ) : (
+                    <div className="flex min-h-10 w-full items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm">
+                      {checklistResponses[item.key]?.comentario || ""}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-8 sm:px-12">
@@ -512,200 +606,176 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
         <div className="border-t border-slate-200 bg-slate-100 px-6 py-6 mt-6">
           <div className="rounded-[1.75rem] bg-white p-6 shadow-sm">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-950">{inspectionTypes[selectedType].label}</h2>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => applyConceptToChecklist("ACEPTADO")} className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold uppercase text-white">
-                  Todo aceptado
-                </button>
-                <button type="button" onClick={() => applyConceptToChecklist("RECHAZADO")} className="rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold uppercase text-white">
-                  Todo rechazado
-                </button>
-                <button type="button" onClick={() => applyConceptToChecklist("")} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase text-slate-700">
-                  Limpiar conceptos
-                </button>
-              </div>
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-slate-950">{inspectionTypes[selectedType].label}</h2>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200 text-sm">
-                <colgroup>
-                  <col className="w-[52%]" />
-                  <col className="w-[18%]" />
-                  <col className="w-[30%]" />
-                </colgroup>
-                <thead className="bg-emerald-900 text-left text-white">
-                  <tr>
-                    <th className="px-4 py-4">FACTORES GENERALES</th>
-                    <th className="px-6 py-4 text-center">CONCEPTO</th>
-                    <th className="px-4 py-4">DETALLES DE APOYO / COMENTARIOS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-slate-50">
-                  {currentChecklist.map((item) => (
-                    <tr key={item.key} className="border-b border-slate-200">
-                      <td className="px-4 py-3 align-top">
-                        <div className="text-xs font-semibold text-slate-950">{item.factor}</div>
-                        {Array.isArray(item.instrucciones) ? (
-                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-800">
-                            {item.instrucciones.map((instruccion) => (
-                              <li key={instruccion}>{instruccion}</li>
+            {!mostrarDatosAdicionales ? (
+              <>
+                {renderChecklistTable({
+                  items: currentChecklist,
+                  mode: "principal",
+                  detailTitle: "DETALLES DE APOYO / COMENTARIOS",
+                })}
+
+                <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200 text-sm">
+                    <colgroup>
+                      <col className="w-[52%]" />
+                      <col className="w-[48%]" />
+                    </colgroup>
+                    <tbody className="divide-y divide-slate-200 bg-slate-50">
+                      <tr>
+                        <td className="px-4 py-4 align-middle text-xs font-medium uppercase text-slate-950">COMENTARIOS</td>
+                        <td className="px-4 py-3 align-middle">
+                          <input
+                            value={comentariosFinales}
+                            onChange={(e) => setComentariosFinales(e.target.value)}
+                            className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-4 align-middle text-xs font-medium uppercase text-slate-950">DECISIÓN FINAL</td>
+                        <td className="px-4 py-3 text-center align-middle">
+                          <select
+                            name="decisionFinal"
+                            value={decisionFinal}
+                            onChange={handleInputChange}
+                            className="mx-auto block h-10 w-full max-w-[300px] rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                          >
+                            {decisionOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-2 text-xs leading-5 text-slate-800">{item.instrucciones}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <select
-                          value={checklistResponses[item.key]?.concepto || ""}
-                          onChange={(e) => handleChecklistConceptChange(item.key, e.target.value as ConceptoRevision)}
-                          className="mx-auto block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                        >
-                          <option value="">--Seleccione--</option>
-                          <option value="ACEPTADO">ACEPTADO</option>
-                          <option value="RECHAZADO">RECHAZADO</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <input
-                          value={checklistResponses[item.key]?.comentario || ""}
-                          onChange={(e) => handleChecklistCommentChange(item.key, e.target.value)}
-                          className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                          placeholder="Solo si aplica"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-b border-slate-200">
-                    <td className="px-4 py-4 align-middle text-xs font-medium uppercase text-slate-950">COMENTARIOS</td>
-                    <td colSpan={2} className="px-4 py-3 align-middle">
-                      <input
-                        value={comentariosFinales}
-                        onChange={(e) => setComentariosFinales(e.target.value)}
-                        className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-4 align-middle text-xs font-medium uppercase text-slate-950">DECISIÓN FINAL</td>
-                    <td colSpan={2} className="px-4 py-3 text-center align-middle">
-                      <select
-                        name="decisionFinal"
-                        value={decisionFinal}
-                        onChange={handleInputChange}
-                        className="mx-auto block h-10 w-full max-w-[300px] rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      >
-                        {decisionOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                          </select>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
 
-            <div className="mt-6 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
-                <div className="flex justify-center">
-                  <p className="rounded-md border border-emerald-700 bg-emerald-50 px-4 py-2 text-sm font-bold uppercase tracking-wide text-emerald-900 shadow-sm">
-                    INSPECCIÓN REALIZADA POR
-                  </p>
+                <div className="mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleAgregarDatosAdicionales}
+                    disabled={!primeraTablaCompleta}
+                    className={`rounded-lg px-5 py-3 text-xs font-semibold uppercase shadow-sm transition ${
+                      primeraTablaCompleta
+                        ? "bg-emerald-700 text-white hover:bg-emerald-800"
+                        : "cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500"
+                    }`}
+                  >
+                    Agregar datos
+                  </button>
                 </div>
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación</label>
-                    <input
-                      value={signatures.inspectorIdentificacion}
-                      onChange={(e) => handleSignatureFieldChange("inspectorIdentificacion", e.target.value)}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold italic uppercase text-slate-900">Nombre</label>
-                    <input
-                      value={signatures.inspectorNombre}
-                      onChange={(e) => handleSignatureFieldChange("inspectorNombre", e.target.value)}
-                      className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold italic uppercase text-slate-900">Cargo</label>
-                    <input
-                      value={signatures.inspectorCargo}
-                      onChange={(e) => handleSignatureFieldChange("inspectorCargo", e.target.value)}
-                      className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-xs font-bold italic uppercase text-slate-900">Firma</p>
-                      <p className="mt-1 text-sm text-slate-600">{signatures.inspectorFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
-                    </div>
-                    <button type="button" onClick={()=>handleOpenSignatureModal("inspector")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
-                      Clic para firmar
-                    </button>
-                  </div>
-                </div>
+              </>
+            ) : (
+              <div className="mt-6">
+                {renderChecklistTable({
+                  items: currentChecklist,
+                  mode: "adicional",
+                  detailTitle: "DETALLES DE APOYO",
+                })}
               </div>
+            )}
+          </div>
 
-              <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
-                <div className="flex justify-center">
-                  <p className="rounded-md border border-emerald-700 bg-emerald-50 px-4 py-2 text-sm font-bold uppercase tracking-wide text-emerald-900 shadow-sm">
-                    COLABORADOR RESPONSABLE DEL ELEMENTO O EQUIPO
-                  </p>
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
+              <div className="flex justify-center">
+                <p className="rounded-md border border-emerald-700 bg-emerald-50 px-4 py-2 text-sm font-bold uppercase tracking-wide text-emerald-900 shadow-sm">
+                  INSPECCIÓN REALIZADA POR
+                </p>
+              </div>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación</label>
+                  <input
+                    value={signatures.inspectorIdentificacion}
+                    onChange={(e) => handleSignatureFieldChange("inspectorIdentificacion", e.target.value)}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
                 </div>
-                <div className="mt-6 space-y-4">
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Nombre</label>
+                  <input
+                    value={signatures.inspectorNombre}
+                    onChange={(e) => handleSignatureFieldChange("inspectorNombre", e.target.value)}
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Cargo</label>
+                  <input
+                    value={signatures.inspectorCargo}
+                    onChange={(e) => handleSignatureFieldChange("inspectorCargo", e.target.value)}
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <label className="text-xs font-bold italic uppercase text-slate-900">Nombre</label>
-                    <input
-                      value={signatures.responsableNombre}
-                      onChange={(e) => handleSignatureFieldChange("responsableNombre", e.target.value)}
-                      className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                    />
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma</p>
+                    <p className="mt-1 text-sm text-slate-600">{signatures.inspectorFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
                   </div>
-                  <div>
-                    <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación</label>
-                    <input
-                      value={signatures.responsableIdentificacion}
-                      onChange={(e) => handleSignatureFieldChange("responsableIdentificacion", e.target.value)}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold italic uppercase text-slate-900">Cargo</label>
-                    <input
-                      value={signatures.responsableCargo}
-                      onChange={(e) => handleSignatureFieldChange("responsableCargo", e.target.value)}
-                      className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-xs font-bold italic uppercase text-slate-900">Firma</p>
-                      <p className="mt-1 text-sm text-slate-600">{signatures.responsableFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
-                    </div>
-                    <button type="button" onClick={()=>handleOpenSignatureModal("responsable")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
-                      Clic para firmar
-                    </button>
-                  </div>
+                  <button type="button" onClick={() => handleOpenSignatureModal("inspector")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                    Clic para firmar
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 flex justify-start">
-              <button onClick={handleSubmit} className="rounded-full bg-emerald-700 px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-                Enviar formulario
-              </button>
+            <div className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
+              <div className="flex justify-center">
+                <p className="rounded-md border border-emerald-700 bg-emerald-50 px-4 py-2 text-sm font-bold uppercase tracking-wide text-emerald-900 shadow-sm">
+                  COLABORADOR RESPONSABLE DEL ELEMENTO O EQUIPO
+                </p>
+              </div>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Nombre</label>
+                  <input
+                    value={signatures.responsableNombre}
+                    onChange={(e) => handleSignatureFieldChange("responsableNombre", e.target.value)}
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación</label>
+                  <input
+                    value={signatures.responsableIdentificacion}
+                    onChange={(e) => handleSignatureFieldChange("responsableIdentificacion", e.target.value)}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Cargo</label>
+                  <input
+                    value={signatures.responsableCargo}
+                    onChange={(e) => handleSignatureFieldChange("responsableCargo", e.target.value)}
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma</p>
+                    <p className="mt-1 text-sm text-slate-600">{signatures.responsableFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
+                  </div>
+                  <button type="button" onClick={() => handleOpenSignatureModal("responsable")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                    Clic para firmar
+                  </button>
+                </div>
+              </div>
             </div>
+          </div>
 
+          <div className="mt-8 flex justify-start">
+            <button onClick={handleSubmit} className="rounded-full bg-emerald-700 px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+              Enviar formulario
+            </button>
           </div>
         </div>
       </div>
