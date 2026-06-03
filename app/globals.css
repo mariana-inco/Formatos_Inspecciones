@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+input,
+textarea,
+select {
+  color: #020617 !important;
+  -webkit-text-fill-color: #020617 !important;
+  caret-color: #020617;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 1;
+}
+
+input:not([type="file"]):focus,
+textarea:focus,
+select:focus,
+input:not([type="file"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: #10b981 !important;
+  outline: 2px solid transparent !important;
+  box-shadow: 0 0 0 3px rgb(209 250 229) !important;
+  --tw-ring-color: rgb(209 250 229) !important;
+  --tw-ring-shadow: 0 0 0 3px rgb(209 250 229) !important;
+}
+
+.date-input::-webkit-datetime-edit,
+.date-input::-webkit-datetime-edit-fields-wrapper,
+.date-input::-webkit-datetime-edit-text,
+.date-input::-webkit-datetime-edit-day-field,
+.date-input::-webkit-datetime-edit-month-field,
+.date-input::-webkit-datetime-edit-year-field {
+  color: #020617;
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  filter: brightness(0);
+}
