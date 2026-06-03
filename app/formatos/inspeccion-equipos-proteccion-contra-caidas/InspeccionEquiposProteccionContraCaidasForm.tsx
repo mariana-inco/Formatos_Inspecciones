@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
-import { inspectionTypes, inspectionTypeKeys, decisionOptions } from "./data";
-import type { ChecklistItem, InspectionTypeKey } from "./data";
+import {
+  decisionOptions as opcionesDecision,
+  inspectionTypeKeys as clavesTiposInspeccion,
+  inspectionTypes as tiposInspeccion,
+} from "./data";
+import type { ChecklistItem as ItemListaChequeo, InspectionTypeKey as ClaveTipoInspeccion } from "./data";
 
-const initialGeneralData = {
+const datosGeneralesIniciales = {
   email: "",
   fechaInspeccion: "",
   fabricante: "",
@@ -23,28 +29,28 @@ const initialGeneralData = {
   antecedentesEquipo: "",
 };
 
-const FORM_META = {
+const METADATOS_FORMATO = {
   codigo: "HSE-F006",
   fecha: "2025-09-18",
   version: "04",
 };
 
-const dateInputClassName =
+const claseCampoFecha =
   "date-input mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const fieldClassName =
+const claseCampoTexto =
   "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const selectClassName =
+const claseCampoSeleccion =
   "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const requiredMark = <span className="text-red-600">*</span>;
+const marcaObligatorio = <span className="text-red-600">*</span>;
 
 type ConceptoRevision = "" | "ACEPTADO" | "RECHAZADO";
 
-type ChecklistResponse = {
+type RespuestaListaChequeo = {
   concepto: ConceptoRevision;
   comentario: string;
 };
 
-type SignatureData = {
+type DatosFirma = {
   inspectorIdentificacion: string;
   inspectorNombre: string;
   inspectorCargo: string;
@@ -59,15 +65,15 @@ type SignatureData = {
 
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
-const camposFirmaNumericos = new Set<keyof SignatureData>(["inspectorIdentificacion", "responsableIdentificacion"]);
-const camposFirmaSinNumeros = new Set<keyof SignatureData>([
+const camposFirmaNumericos = new Set<keyof DatosFirma>(["inspectorIdentificacion", "responsableIdentificacion"]);
+const camposFirmaSinNumeros = new Set<keyof DatosFirma>([
   "inspectorNombre",
   "inspectorCargo",
   "responsableNombre",
   "responsableCargo",
 ]);
 
-const inspectionButtonLabels: Record<InspectionTypeKey, string> = {
+const etiquetasBotonesInspeccion: Record<ClaveTipoInspeccion, string> = {
   arnes: "INSPECCIÓN ARNÉS",
   eslingas: "INSPECCIÓN ESLINGAS",
   descendedor: "INSPECCIÓN DESCENDEDOR",
@@ -78,31 +84,31 @@ const inspectionButtonLabels: Record<InspectionTypeKey, string> = {
   "linea-vida": "LÍNEA DE VIDA",
 };
 
-const inspectionButtonIcons: Record<InspectionTypeKey, string> = {
-  arnes: "🦺",
-  eslingas: "⛓️",
-  descendedor: "🧗",
-  mosqueton: "🔗",
-  autoretracto: "🪢",
-  freno: "🛞",
-  tieoff: "⚓",
-  "linea-vida": "🪜",
+const imagenesBotonesInspeccion: Record<ClaveTipoInspeccion, string> = {
+  arnes: "/Iconos/arnes-de-seguridad.png",
+  eslingas: "/Iconos/eslingas-de-cinta.png",
+  descendedor: "/Iconos/rappel.png",
+  mosqueton: "/Iconos/mosqueton.png",
+  autoretracto: "/Iconos/autoretract.png",
+  freno: "/Iconos/frenos.png",
+  tieoff: "/Iconos/tie-off.png",
+  "linea-vida": "/Iconos/lineadevida.png",
 };
 
 export default function InspeccionEquiposProteccionContraCaidasForm() {
-  const [generalData, setGeneralData] = useState(initialGeneralData);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
-  const [imageName, setImageName] = useState("");
+  const [datosGenerales, setDatosGenerales] = useState(datosGeneralesIniciales);
+  const [urlVistaPreviaImagen, setUrlVistaPreviaImagen] = useState("");
+  const [nombreImagen, setNombreImagen] = useState("");
   const [datosRegistrados, setDatosRegistrados] = useState(false);
-  const [selectedType, setSelectedType] = useState(inspectionTypeKeys[0]);
+  const [tipoInspeccionSeleccionado, setTipoInspeccionSeleccionado] = useState(clavesTiposInspeccion[0]);
   const [decisionFinal, setDecisionFinal] = useState("");
   const [comentariosFinales, setComentariosFinales] = useState("");
-  const [checklistResponses, setChecklistResponses] = useState<Record<string, ChecklistResponse>>({});
+  const [respuestasListaChequeo, setRespuestasListaChequeo] = useState<Record<string, RespuestaListaChequeo>>({});
   const [mostrarDatosAdicionales, setMostrarDatosAdicionales] = useState(false);
-  const [signatureModalRole, setSignatureModalRole] = useState<"inspector" | "responsable" | null>(null);
-  const [signatureHasStroke, setSignatureHasStroke] = useState(false);
-  const signatureRef = useRef<SignatureRef>(null);
-  const [signatures, setSignatures] = useState<SignatureData>({
+  const [rolModalFirma, setRolModalFirma] = useState<"inspector" | "responsable" | null>(null);
+  const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
+  const referenciaFirma = useRef<SignatureRef>(null);
+  const [firmas, setFirmas] = useState<DatosFirma>({
     inspectorIdentificacion: "",
     inspectorNombre: "",
     inspectorCargo: "",
@@ -115,73 +121,73 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     responsableFirmado: false,
   });
 
-  const currentChecklist = useMemo(() => inspectionTypes[selectedType].checklist || [], [selectedType]);
+  const listaChequeoActual = useMemo(() => tiposInspeccion[tipoInspeccionSeleccionado].checklist || [], [tipoInspeccionSeleccionado]);
   const primeraTablaCompleta = useMemo(
-    () => currentChecklist.length > 0 && currentChecklist.every((item) => Boolean(checklistResponses[item.key]?.concepto)),
-    [currentChecklist, checklistResponses]
+    () => listaChequeoActual.length > 0 && listaChequeoActual.every((item) => Boolean(respuestasListaChequeo[item.key]?.concepto)),
+    [listaChequeoActual, respuestasListaChequeo]
   );
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const manejarCambioCampo = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target as HTMLInputElement;
-    setGeneralData((prev) => ({ ...prev, [name]: value }));
+    setDatosGenerales((prev) => ({ ...prev, [name]: value }));
     if (name === "decisionFinal") setDecisionFinal(value);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageName(file.name);
-    setImagePreviewUrl(URL.createObjectURL(file));
+  const manejarCargaImagen = (e: ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setNombreImagen(archivo.name);
+    setUrlVistaPreviaImagen(URL.createObjectURL(archivo));
   };
 
-  const handleAddData = () => setDatosRegistrados(true);
+  const registrarDatosEquipo = () => setDatosRegistrados(true);
 
-  const handleClearSignature = () => {
-    signatureRef.current?.clear();
-    setSignatureHasStroke(false);
+  const limpiarFirma = () => {
+    referenciaFirma.current?.clear();
+    setFirmaTieneTrazo(false);
   };
 
-  const handleSaveSignature = () => {
-    const svg = signatureRef.current?.svg;
-    if (!svg || !signatureModalRole) return;
-    if (!signatureHasStroke) {
+  const guardarFirma = () => {
+    const svg = referenciaFirma.current?.svg;
+    if (!svg || !rolModalFirma) return;
+    if (!firmaTieneTrazo) {
       alert("Por favor registre la firma antes de guardar.");
       return;
     }
-    const serializedSignature = new XMLSerializer().serializeToString(svg);
-    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serializedSignature)}`;
-    if (signatureModalRole === "inspector") {
-      setSignatures((s) => ({ ...s, inspectorFirma: dataUrl, inspectorFirmado: true }));
+    const firmaSerializada = new XMLSerializer().serializeToString(svg);
+    const firmaComoUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(firmaSerializada)}`;
+    if (rolModalFirma === "inspector") {
+      setFirmas((s) => ({ ...s, inspectorFirma: firmaComoUrl, inspectorFirmado: true }));
     } else {
-      setSignatures((s) => ({ ...s, responsableFirma: dataUrl, responsableFirmado: true }));
+      setFirmas((s) => ({ ...s, responsableFirma: firmaComoUrl, responsableFirmado: true }));
     }
-    setSignatureModalRole(null);
-    setSignatureHasStroke(false);
+    setRolModalFirma(null);
+    setFirmaTieneTrazo(false);
   };
 
-  const handleChecklistConceptChange = (key: string, concepto: ConceptoRevision) => {
-    setChecklistResponses((prev) => ({
+  const manejarCambioConcepto = (key: string, concepto: ConceptoRevision) => {
+    setRespuestasListaChequeo((prev) => ({
       ...prev,
       [key]: { concepto, comentario: prev[key]?.comentario || "" },
     }));
   };
 
-  const handleChecklistCommentChange = (key: string, comentario: string) => {
-    setChecklistResponses((prev) => ({
+  const manejarCambioComentario = (key: string, comentario: string) => {
+    setRespuestasListaChequeo((prev) => ({
       ...prev,
       [key]: { concepto: prev[key]?.concepto || "", comentario },
     }));
   };
 
-  const handleInspectionTypeSelect = (type: InspectionTypeKey) => {
-    setSelectedType(type);
-    setChecklistResponses({});
+  const seleccionarTipoInspeccion = (tipo: ClaveTipoInspeccion) => {
+    setTipoInspeccionSeleccionado(tipo);
+    setRespuestasListaChequeo({});
     setMostrarDatosAdicionales(false);
     setComentariosFinales("");
     setDecisionFinal("");
   };
 
-  const handleAgregarDatosAdicionales = () => {
+  const agregarDatosAdicionales = () => {
     if (!primeraTablaCompleta) {
       alert("Complete la columna CONCEPTO de la primera tabla antes de agregar datos.");
       return;
@@ -190,60 +196,60 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     setMostrarDatosAdicionales(true);
   };
 
-  const handleOpenSignatureModal = (role: "inspector" | "responsable") => {
-    setSignatureHasStroke(false);
-    setSignatureModalRole(role);
+  const abrirModalFirma = (role: "inspector" | "responsable") => {
+    setFirmaTieneTrazo(false);
+    setRolModalFirma(role);
   };
 
-  const handleCloseSignatureModal = () => {
-    setSignatureHasStroke(false);
-    setSignatureModalRole(null);
+  const cerrarModalFirma = () => {
+    setFirmaTieneTrazo(false);
+    setRolModalFirma(null);
   };
 
-  const handleSignatureFieldChange = (field: keyof SignatureData, value: string) => {
-    let nextValue = value;
-    if (camposFirmaNumericos.has(field)) nextValue = soloNumeros(value);
-    if (camposFirmaSinNumeros.has(field)) nextValue = quitarNumeros(value);
-    setSignatures((prev) => ({ ...prev, [field]: nextValue }));
+  const manejarCambioCampoFirma = (campo: keyof DatosFirma, value: string) => {
+    let siguienteValor = value;
+    if (camposFirmaNumericos.has(campo)) siguienteValor = soloNumeros(value);
+    if (camposFirmaSinNumeros.has(campo)) siguienteValor = quitarNumeros(value);
+    setFirmas((prev) => ({ ...prev, [campo]: siguienteValor }));
   };
 
-  const buildRespuestaJson = () => {
-    const decisionFinalTexto = decisionOptions.find((option) => option.value === decisionFinal)?.label || "";
+  const construirRespuestaJson = () => {
+    const decisionFinalTexto = opcionesDecision.find((option) => option.value === decisionFinal)?.label || "";
 
     return {
       formato: {
         nombre: "Inspección de equipos de protección contra caídas",
-        codigo: FORM_META.codigo,
-        fecha: FORM_META.fecha,
-        version: FORM_META.version,
+        codigo: METADATOS_FORMATO.codigo,
+        fecha: METADATOS_FORMATO.fecha,
+        version: METADATOS_FORMATO.version,
         area: "Gestión HSE",
       },
       fechaRegistro: new Date().toISOString(),
       inspeccion: {
-        tipo: selectedType,
-        nombre: inspectionTypes[selectedType].label,
+        tipo: tipoInspeccionSeleccionado,
+        nombre: tiposInspeccion[tipoInspeccionSeleccionado].label,
       },
       datosEquipo: {
-        ...generalData,
+        ...datosGenerales,
         imagenEquipo: {
-          nombreArchivo: imageName || "",
-          imagenAdjunta: Boolean(imageName),
+          nombreArchivo: nombreImagen || "",
+          imagenAdjunta: Boolean(nombreImagen),
         },
       },
-      respuestasChecklist: currentChecklist.map((item) => ({
+      respuestasChecklist: listaChequeoActual.map((item) => ({
         key: item.key,
         factor: item.factor,
         instrucciones: item.instrucciones,
-        concepto: checklistResponses[item.key]?.concepto || "",
-        comentario: checklistResponses[item.key]?.comentario || "",
+        concepto: respuestasListaChequeo[item.key]?.concepto || "",
+        comentario: respuestasListaChequeo[item.key]?.comentario || "",
       })),
       datosAdicionalesChecklist: mostrarDatosAdicionales
-        ? currentChecklist.map((item) => ({
+        ? listaChequeoActual.map((item) => ({
             key: item.key,
             factor: item.factor,
             instrucciones: item.instrucciones,
-            concepto: checklistResponses[item.key]?.concepto || "",
-            detalleApoyo: checklistResponses[item.key]?.comentario || "",
+            concepto: respuestasListaChequeo[item.key]?.concepto || "",
+            detalleApoyo: respuestasListaChequeo[item.key]?.comentario || "",
           }))
         : [],
       cierreInspeccion: {
@@ -251,27 +257,41 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
         decisionFinal,
         decisionFinalTexto,
       },
-      firmas: signatures,
+      firmas: firmas,
     };
   };
 
-  const handleSubmit = async () => {
+  const enviarFormulario = async () => {
+    if (
+      !firmas.inspectorIdentificacion ||
+      !firmas.inspectorNombre ||
+      !firmas.inspectorCargo ||
+      !firmas.inspectorFirmado ||
+      !firmas.responsableNombre ||
+      !firmas.responsableIdentificacion ||
+      !firmas.responsableCargo ||
+      !firmas.responsableFirmado
+    ) {
+      alert("Complete los campos obligatorios y registre ambas firmas antes de enviar el formulario.");
+      return;
+    }
+
     if (!confirm("¿Confirmas el envío del formulario HSE-F006?")) return;
-    const respuestaJson = buildRespuestaJson();
+    const respuestaJson = construirRespuestaJson();
 
     try {
-      const response = await fetch("/api/formatos/inspeccion-contra-caidas/respuestas", {
+      const respuestaHttp = await fetch("/api/formatos/inspeccion-contra-caidas/respuestas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(respuestaJson),
       });
 
-      if (!response.ok) {
+      if (!respuestaHttp.ok) {
         throw new Error("No se pudo guardar la respuesta en JSON.");
       }
 
-      const result = (await response.json()) as { fileName: string; filePath: string };
-      console.log("Respuesta guardada en JSON:", result);
+      const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
+      console.log("Respuesta guardada en JSON:", resultadoGuardado);
       console.log("Registro completo del formulario:", respuestaJson);
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
@@ -279,8 +299,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     }
   };
 
-  const renderChecklistTable = (options: {
-    items: ChecklistItem[];
+  const renderizarTablaListaChequeo = (opciones: {
+    items: ItemListaChequeo[];
     mode: "principal" | "adicional";
     detailTitle: string;
   }) => (
@@ -295,15 +315,15 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           <tr>
             <th className="px-4 py-4">FACTORES GENERALES</th>
             <th className="px-6 py-4 text-center">CONCEPTO</th>
-            <th className="px-4 py-4">{options.detailTitle}</th>
+            <th className="px-4 py-4">{opciones.detailTitle}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 bg-slate-50">
-          {options.items.map((item) => {
-            const concepto = checklistResponses[item.key]?.concepto || "";
+          {opciones.items.map((item) => {
+            const concepto = respuestasListaChequeo[item.key]?.concepto || "";
 
             return (
-              <tr key={`${options.mode}-${item.key}`} className="border-b border-slate-200">
+              <tr key={`${opciones.mode}-${item.key}`} className="border-b border-slate-200">
                 <td className="px-4 py-3 align-top">
                   <div className="text-xs font-semibold text-slate-950">{item.factor}</div>
                   {Array.isArray(item.instrucciones) ? (
@@ -317,10 +337,10 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   )}
                 </td>
                 <td className="px-4 py-3 align-top">
-                  {options.mode === "principal" ? (
+                  {opciones.mode === "principal" ? (
                     <select
                       value={concepto}
-                      onChange={(e) => handleChecklistConceptChange(item.key, e.target.value as ConceptoRevision)}
+                      onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
                       className="mx-auto block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                     >
                       <option value="">--Seleccione--</option>
@@ -334,16 +354,16 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   )}
                 </td>
                 <td className="px-4 py-3 align-top">
-                  {options.mode === "principal" ? (
+                  {opciones.mode === "principal" ? (
                     <input
-                      value={checklistResponses[item.key]?.comentario || ""}
-                      onChange={(e) => handleChecklistCommentChange(item.key, e.target.value)}
+                      value={respuestasListaChequeo[item.key]?.comentario || ""}
+                      onChange={(e) => manejarCambioComentario(item.key, e.target.value)}
                       className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                       placeholder="Solo si aplica"
                     />
                   ) : (
                     <div className="flex min-h-10 w-full items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm">
-                      {checklistResponses[item.key]?.comentario || ""}
+                      {respuestasListaChequeo[item.key]?.comentario || ""}
                     </div>
                   )}
                 </td>
@@ -371,37 +391,37 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
             <div className="grid grid-rows-[24px_1fr_24px]">
               <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Codigo:</span> {FORM_META.codigo}
+                <span className="font-bold italic">Codigo:</span> {METADATOS_FORMATO.codigo}
               </div>
               <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Fecha:</span> {FORM_META.fecha}
+                <span className="font-bold italic">Fecha:</span> {METADATOS_FORMATO.fecha}
               </div>
               <div className="px-2 py-1">
-                <span className="font-bold italic">Version:</span> {FORM_META.version}
+                <span className="font-bold italic">Version:</span> {METADATOS_FORMATO.version}
               </div>
             </div>
           </div>
         </div>
 
         <div className="mb-6 flex flex-wrap justify-center gap-3 border-t-2 border-blue-500 pt-8">
-          {inspectionTypeKeys.map((type) => {
-            const isSelected = selectedType === type;
+          {clavesTiposInspeccion.map((tipo) => {
+            const estaSeleccionado = tipoInspeccionSeleccionado === tipo;
             return (
               <button
-                key={type}
+                key={tipo}
                 type="button"
-                onClick={() => handleInspectionTypeSelect(type)}
-                aria-pressed={isSelected}
+                onClick={() => seleccionarTipoInspeccion(tipo)}
+                aria-pressed={estaSeleccionado}
                 className={`flex min-h-[60px] w-[170px] items-center justify-center gap-3 rounded-lg border px-3 py-3 text-xs font-bold uppercase text-white shadow-sm transition ${
-                  isSelected
+                  estaSeleccionado
                     ? "border-emerald-500 bg-emerald-800 ring-2 ring-emerald-300"
                     : "border-slate-800 bg-slate-800 hover:bg-slate-700"
                 }`}
               >
                 <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-md bg-slate-950/20 text-2xl leading-none">
-                  {inspectionButtonIcons[type]}
+                  <Image src={imagenesBotonesInspeccion[tipo]} alt="" width={28} height={28} className="size-7 object-contain" />
                 </span>
-                <span className="leading-5">{inspectionButtonLabels[type]}</span>
+                <span className="leading-5">{etiquetasBotonesInspeccion[tipo]}</span>
               </button>
             );
           })}
@@ -419,12 +439,12 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Datos generales</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Correo electrónico {requiredMark}</label>
-                    <input name="email" type="email" value={generalData.email} onChange={handleInputChange} placeholder="usuario@empresa.com" className={fieldClassName} />
+                    <label className="text-sm font-semibold text-slate-700">Correo electrónico {marcaObligatorio}</label>
+                    <input name="email" type="email" value={datosGenerales.email} onChange={manejarCambioCampo} placeholder="usuario@empresa.com" className={claseCampoTexto} />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Fecha de inspección {requiredMark}</label>
-                    <input name="fechaInspeccion" type="date" value={generalData.fechaInspeccion} onChange={handleInputChange} aria-label="Seleccione una fecha de inspección" className={dateInputClassName} />
+                    <label className="text-sm font-semibold text-slate-700">Fecha de inspección {marcaObligatorio}</label>
+                    <input name="fechaInspeccion" type="date" value={datosGenerales.fechaInspeccion} onChange={manejarCambioCampo} aria-label="Seleccione una fecha de inspección" className={claseCampoFecha} />
                   </div>
                 </div>
               </section>
@@ -433,28 +453,28 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Identificación del equipo</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Fabricante {requiredMark}</label>
-                    <input name="fabricante" value={generalData.fabricante} onChange={handleInputChange} placeholder="Ej: Petzl" className={fieldClassName} />
+                    <label className="text-sm font-semibold text-slate-700">Fabricante {marcaObligatorio}</label>
+                    <input name="fabricante" value={datosGenerales.fabricante} onChange={manejarCambioCampo} placeholder="Ej: Petzl" className={claseCampoTexto} />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Modelo {requiredMark}</label>
-                    <input name="modelo" value={generalData.modelo} onChange={handleInputChange} placeholder="Ej: ASAP LOCK" className={fieldClassName} />
+                    <label className="text-sm font-semibold text-slate-700">Modelo {marcaObligatorio}</label>
+                    <input name="modelo" value={datosGenerales.modelo} onChange={manejarCambioCampo} placeholder="Ej: ASAP LOCK" className={claseCampoTexto} />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Número de serie {requiredMark}</label>
-                    <input name="numeroSerie" value={generalData.numeroSerie} onChange={handleInputChange} placeholder="Ej: SN-000123" className={fieldClassName} />
+                    <label className="text-sm font-semibold text-slate-700">Número de serie {marcaObligatorio}</label>
+                    <input name="numeroSerie" value={datosGenerales.numeroSerie} onChange={manejarCambioCampo} placeholder="Ej: SN-000123" className={claseCampoTexto} />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Número interno {requiredMark}</label>
-                    <input name="numeroInterno" value={generalData.numeroInterno} onChange={handleInputChange} placeholder="Ej: EQ-045" className={fieldClassName} />
+                    <label className="text-sm font-semibold text-slate-700">Número interno {marcaObligatorio}</label>
+                    <input name="numeroInterno" value={datosGenerales.numeroInterno} onChange={manejarCambioCampo} placeholder="Ej: EQ-045" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Certificado</label>
-                    <input name="certificado" value={generalData.certificado} onChange={handleInputChange} placeholder="Ej: CERT-2026-001" className={fieldClassName} />
+                    <input name="certificado" value={datosGenerales.certificado} onChange={manejarCambioCampo} placeholder="Ej: CERT-2026-001" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Número de lote</label>
-                    <input name="numeroLote" value={generalData.numeroLote} onChange={handleInputChange} placeholder="Ej: LOTE-2026-01" className={fieldClassName} />
+                    <input name="numeroLote" value={datosGenerales.numeroLote} onChange={manejarCambioCampo} placeholder="Ej: LOTE-2026-01" className={claseCampoTexto} />
                   </div>
                 </div>
               </section>
@@ -464,15 +484,15 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Fecha de fabricación</label>
-                    <input name="fechaFabricacion" type="date" value={generalData.fechaFabricacion} onChange={handleInputChange} aria-label="Seleccione una fecha de fabricación" className={dateInputClassName} />
+                    <input name="fechaFabricacion" type="date" value={datosGenerales.fechaFabricacion} onChange={manejarCambioCampo} aria-label="Seleccione una fecha de fabricación" className={claseCampoFecha} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Fecha de compra</label>
-                    <input name="fechaCompra" type="date" value={generalData.fechaCompra} onChange={handleInputChange} aria-label="Seleccione una fecha de compra" className={dateInputClassName} />
+                    <input name="fechaCompra" type="date" value={datosGenerales.fechaCompra} onChange={manejarCambioCampo} aria-label="Seleccione una fecha de compra" className={claseCampoFecha} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Fecha primera utilización</label>
-                    <input name="fechaPrimeraUtilizacion" type="date" value={generalData.fechaPrimeraUtilizacion} onChange={handleInputChange} aria-label="Seleccione una fecha de primera utilización" className={dateInputClassName} />
+                    <input name="fechaPrimeraUtilizacion" type="date" value={datosGenerales.fechaPrimeraUtilizacion} onChange={manejarCambioCampo} aria-label="Seleccione una fecha de primera utilización" className={claseCampoFecha} />
                   </div>
                 </div>
               </section>
@@ -481,8 +501,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Características técnicas</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Periodicidad {requiredMark}</label>
-                    <select name="periodicidad" value={generalData.periodicidad} onChange={handleInputChange} className={selectClassName}>
+                    <label className="text-sm font-semibold text-slate-700">Periodicidad {marcaObligatorio}</label>
+                    <select name="periodicidad" value={datosGenerales.periodicidad} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
                       <option value="">Seleccione una periodicidad</option>
                       <option value="Mensual">Mensual</option>
                       <option value="Trimestral">Trimestral</option>
@@ -492,7 +512,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Tipo de freno</label>
-                    <select name="tipoFreno" value={generalData.tipoFreno} onChange={handleInputChange} className={selectClassName}>
+                    <select name="tipoFreno" value={datosGenerales.tipoFreno} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
                       <option value="">Seleccione el tipo de freno</option>
                       <option value="Manual">Manual</option>
                       <option value="Automático">Automático</option>
@@ -508,23 +528,23 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div className="mt-4">
                   <label className="text-sm font-semibold text-slate-700">Adjuntar imagen del equipo</label>
                   <label className="mt-2 flex min-h-[170px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-600 bg-white px-4 py-6 text-center transition hover:bg-emerald-50">
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="sr-only" />
+                    <input type="file" accept="image/*" onChange={manejarCargaImagen} className="sr-only" />
                     <span className="text-sm font-bold text-emerald-900">Arrastra una imagen aquí o haz clic para seleccionar</span>
                     <span className="mt-1 text-xs text-slate-600">Formatos permitidos: JPG, PNG o WEBP</span>
                     <span className="mt-3 max-w-full truncate rounded-full bg-emerald-50 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm">
-                      {imageName || "Ningún archivo seleccionado"}
+                      {nombreImagen || "Ningún archivo seleccionado"}
                     </span>
                   </label>
-                  {imagePreviewUrl ? (
+                  {urlVistaPreviaImagen ? (
                     <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-                      <img src={imagePreviewUrl} alt="Imagen del equipo seleccionada" className="mx-auto max-h-40 object-contain" />
+                      <img src={urlVistaPreviaImagen} alt="Imagen del equipo seleccionada" className="mx-auto max-h-40 object-contain" />
                     </div>
                   ) : null}
                 </div>
               </section>
 
               <div className="mt-6 flex justify-start">
-                <button type="button" onClick={handleAddData} className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-semibold text-white">Agregar Datos</button>
+                <button type="button" onClick={registrarDatosEquipo} className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-semibold text-white">Agregar Datos</button>
               </div>
             </div>
 
@@ -532,7 +552,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               <label className="text-xs font-semibold italic text-slate-950">
                 ANTECEDENTES DEL EQUIPO Condiciones de uso o acontecimiento excepcional durante la utilización (ejemplos: caída o detención de una caída, utilización o almacenamiento a temperaturas extremas, modificación fuera de los talleres del fabricante)
               </label>
-              <textarea name="antecedentesEquipo" value={generalData.antecedentesEquipo} onChange={handleInputChange} rows={2} className="mt-3 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-md outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100" />
+              <textarea name="antecedentesEquipo" value={datosGenerales.antecedentesEquipo} onChange={manejarCambioCampo} rows={2} className="mt-3 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-md outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100" />
             </div>
 
             <div className="mt-5 space-y-6 text-center italic">
@@ -554,18 +574,18 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               <div className="grid gap-4 px-4 py-6 sm:grid-cols-[2fr_1fr]">
                 <div className="space-y-3">
                   {[
-                    ["Fecha inspección", generalData.fechaInspeccion],
-                    ["Fabricante", generalData.fabricante],
-                    ["Modelo", generalData.modelo],
-                    ["Número de serie", generalData.numeroSerie],
-                    ["Número interno", generalData.numeroInterno],
-                    ["Periodicidad", generalData.periodicidad],
-                    ["Fecha de fabricación", generalData.fechaFabricacion],
-                    ["Certificado", generalData.certificado],
-                    ["Fecha de compra", generalData.fechaCompra],
-                    ["Número de lote", generalData.numeroLote],
-                    ["Tipo de freno", generalData.tipoFreno],
-                    ["Fecha primera utilización", generalData.fechaPrimeraUtilizacion],
+                    ["Fecha inspección", datosGenerales.fechaInspeccion],
+                    ["Fabricante", datosGenerales.fabricante],
+                    ["Modelo", datosGenerales.modelo],
+                    ["Número de serie", datosGenerales.numeroSerie],
+                    ["Número interno", datosGenerales.numeroInterno],
+                    ["Periodicidad", datosGenerales.periodicidad],
+                    ["Fecha de fabricación", datosGenerales.fechaFabricacion],
+                    ["Certificado", datosGenerales.certificado],
+                    ["Fecha de compra", datosGenerales.fechaCompra],
+                    ["Número de lote", datosGenerales.numeroLote],
+                    ["Tipo de freno", datosGenerales.tipoFreno],
+                    ["Fecha primera utilización", datosGenerales.fechaPrimeraUtilizacion],
                   ].map((item) => (
                     <div key={String(item[0])} className="grid grid-cols-[1fr_1fr] gap-3 rounded bg-white px-4 py-3">
                       <div className="text-xs font-semibold text-slate-500">{item[0]}</div>
@@ -574,7 +594,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   ))}
                 </div>
                 <div className="rounded border bg-white p-4">
-                  {imagePreviewUrl ? <img src={imagePreviewUrl} alt="Foto" className="w-full object-contain" /> : <div className="min-h-[180px] flex items-center justify-center text-sm text-slate-400">Foto del equipo</div>}
+                  {urlVistaPreviaImagen ? <img src={urlVistaPreviaImagen} alt="Foto" className="w-full object-contain" /> : <div className="min-h-[180px] flex items-center justify-center text-sm text-slate-400">Foto del equipo</div>}
                 </div>
               </div>
             </div>
@@ -585,8 +605,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               </label>
               <textarea
                 name="antecedentesEquipo"
-                value={generalData.antecedentesEquipo}
-                onChange={handleInputChange}
+                value={datosGenerales.antecedentesEquipo}
+                onChange={manejarCambioCampo}
                 rows={3}
                 className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                 placeholder="Ingrese los antecedentes del equipo"
@@ -607,13 +627,13 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
         <div className="border-t border-slate-200 bg-slate-100 px-6 py-6 mt-6">
           <div className="rounded-[1.75rem] bg-white p-6 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold text-slate-950">{inspectionTypes[selectedType].label}</h2>
+              <h2 className="text-xl font-semibold text-slate-950">{tiposInspeccion[tipoInspeccionSeleccionado].label}</h2>
             </div>
 
             {!mostrarDatosAdicionales ? (
               <>
-                {renderChecklistTable({
-                  items: currentChecklist,
+                {renderizarTablaListaChequeo({
+                  items: listaChequeoActual,
                   mode: "principal",
                   detailTitle: "DETALLES DE APOYO / COMENTARIOS",
                 })}
@@ -641,10 +661,10 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                           <select
                             name="decisionFinal"
                             value={decisionFinal}
-                            onChange={handleInputChange}
+                            onChange={manejarCambioCampo}
                             className="mx-auto block h-10 w-full max-w-[300px] rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                           >
-                            {decisionOptions.map((opt) => (
+                            {opcionesDecision.map((opt) => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
@@ -657,7 +677,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div className="mt-4 flex justify-center">
                   <button
                     type="button"
-                    onClick={handleAgregarDatosAdicionales}
+                    onClick={agregarDatosAdicionales}
                     disabled={!primeraTablaCompleta}
                     className={`rounded-lg px-5 py-3 text-xs font-semibold uppercase shadow-sm transition ${
                       primeraTablaCompleta
@@ -671,8 +691,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               </>
             ) : (
               <div className="mt-6">
-                {renderChecklistTable({
-                  items: currentChecklist,
+                {renderizarTablaListaChequeo({
+                  items: listaChequeoActual,
                   mode: "adicional",
                   detailTitle: "DETALLES DE APOYO",
                 })}
@@ -689,37 +709,40 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               </div>
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación</label>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación {marcaObligatorio}</label>
                   <input
-                    value={signatures.inspectorIdentificacion}
-                    onChange={(e) => handleSignatureFieldChange("inspectorIdentificacion", e.target.value)}
+                    value={firmas.inspectorIdentificacion}
+                    onChange={(e) => manejarCambioCampoFirma("inspectorIdentificacion", e.target.value)}
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    required
                     className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold italic uppercase text-slate-900">Nombre</label>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Nombre {marcaObligatorio}</label>
                   <input
-                    value={signatures.inspectorNombre}
-                    onChange={(e) => handleSignatureFieldChange("inspectorNombre", e.target.value)}
+                    value={firmas.inspectorNombre}
+                    onChange={(e) => manejarCambioCampoFirma("inspectorNombre", e.target.value)}
+                    required
                     className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold italic uppercase text-slate-900">Cargo</label>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Cargo {marcaObligatorio}</label>
                   <input
-                    value={signatures.inspectorCargo}
-                    onChange={(e) => handleSignatureFieldChange("inspectorCargo", e.target.value)}
+                    value={firmas.inspectorCargo}
+                    onChange={(e) => manejarCambioCampoFirma("inspectorCargo", e.target.value)}
+                    required
                     className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma</p>
-                    <p className="mt-1 text-sm text-slate-600">{signatures.inspectorFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
+                    <p className="mt-1 text-sm text-slate-600">{firmas.inspectorFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
                   </div>
-                  <button type="button" onClick={() => handleOpenSignatureModal("inspector")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                  <button type="button" onClick={() => abrirModalFirma("inspector")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
                     Clic para firmar
                   </button>
                 </div>
@@ -734,37 +757,40 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               </div>
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="text-xs font-bold italic uppercase text-slate-900">Nombre</label>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación {marcaObligatorio}</label>
                   <input
-                    value={signatures.responsableNombre}
-                    onChange={(e) => handleSignatureFieldChange("responsableNombre", e.target.value)}
-                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación</label>
-                  <input
-                    value={signatures.responsableIdentificacion}
-                    onChange={(e) => handleSignatureFieldChange("responsableIdentificacion", e.target.value)}
+                    value={firmas.responsableIdentificacion}
+                    onChange={(e) => manejarCambioCampoFirma("responsableIdentificacion", e.target.value)}
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    required
                     className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold italic uppercase text-slate-900">Cargo</label>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Nombre {marcaObligatorio}</label>
                   <input
-                    value={signatures.responsableCargo}
-                    onChange={(e) => handleSignatureFieldChange("responsableCargo", e.target.value)}
+                    value={firmas.responsableNombre}
+                    onChange={(e) => manejarCambioCampoFirma("responsableNombre", e.target.value)}
+                    required
+                    className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold italic uppercase text-slate-900">Cargo {marcaObligatorio}</label>
+                  <input
+                    value={firmas.responsableCargo}
+                    onChange={(e) => manejarCambioCampoFirma("responsableCargo", e.target.value)}
+                    required
                     className="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma</p>
-                    <p className="mt-1 text-sm text-slate-600">{signatures.responsableFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
+                    <p className="mt-1 text-sm text-slate-600">{firmas.responsableFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
                   </div>
-                  <button type="button" onClick={() => handleOpenSignatureModal("responsable")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                  <button type="button" onClick={() => abrirModalFirma("responsable")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
                     Clic para firmar
                   </button>
                 </div>
@@ -773,24 +799,24 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           </div>
 
           <div className="mt-8 flex justify-start">
-            <button onClick={handleSubmit} className="rounded-full bg-emerald-700 px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+            <button onClick={enviarFormulario} className="rounded-full bg-emerald-700 px-8 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
               Enviar formulario
             </button>
           </div>
         </div>
       </div>
 
-      {signatureModalRole ? (
+      {rolModalFirma ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6">
           <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-2xl">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-700">Firma digital</p>
                 <h3 className="mt-1 text-xl font-semibold text-slate-950">
-                  {signatureModalRole === "inspector" ? "Inspección realizada por" : "Colaborador responsable"}
+                  {rolModalFirma === "inspector" ? "Inspección realizada por" : "Colaborador responsable"}
                 </h3>
               </div>
-              <button type="button" onClick={handleCloseSignatureModal} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+              <button type="button" onClick={cerrarModalFirma} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
                 Cerrar
               </button>
             </div>
@@ -798,10 +824,10 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
             <div className="mt-5">
               <label className="text-xs font-bold italic uppercase text-slate-900">Firma</label>
               <Signature
-                ref={signatureRef}
+                ref={referenciaFirma}
                 fill="#0f172a"
                 onPointer={(points) => {
-                  if (points.length > 0) setSignatureHasStroke(true);
+                  if (points.length > 0) setFirmaTieneTrazo(true);
                 }}
                 options={{
                   size: 5,
@@ -814,13 +840,13 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
             </div>
 
             <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button type="button" onClick={handleClearSignature} className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700">
+              <button type="button" onClick={limpiarFirma} className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700">
                 Limpiar
               </button>
-              <button type="button" onClick={handleCloseSignatureModal} className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700">
+              <button type="button" onClick={cerrarModalFirma} className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700">
                 Cancelar
               </button>
-              <button type="button" onClick={handleSaveSignature} className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white">
+              <button type="button" onClick={guardarFirma} className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white">
                 Guardar firma
               </button>
             </div>
@@ -830,3 +856,4 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     </div>
   );
 }
+
