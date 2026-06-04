@@ -40,7 +40,7 @@ export default function FormatosPage() {
                   <p className="text-sm text-slate-500">Ruta disponible: {formato.ruta}</p>
                   <Link
                     href={formato.ruta}
-                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    className="inline-flex min-w-[110px] shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                   >
                     Abrir formato
                   </Link>
