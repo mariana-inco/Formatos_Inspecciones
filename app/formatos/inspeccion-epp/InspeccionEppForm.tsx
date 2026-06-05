@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
+import type { ChangeEvent } from "react";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
 import type { CampoEppKey, CondicionEpp } from "./data";
 
@@ -71,7 +72,7 @@ export default function InspeccionEppForm() {
   const [registros, setRegistros] = useState<RegistroEpp[]>([]);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const fieldName = name as keyof DatosFormulario;
     const nextValue = camposSinNumeros.has(fieldName) ? quitarNumeros(value) : value;

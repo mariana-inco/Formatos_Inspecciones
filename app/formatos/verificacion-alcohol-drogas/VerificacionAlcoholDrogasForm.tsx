@@ -378,7 +378,7 @@ export default function VerificacionAlcoholDrogasForm() {
 
         <div className="border-t-2 border-blue-500 pt-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <section className="space-y-7">
+            <section className="grid gap-5 md:grid-cols-2">
               <div>
                 <label className={etiquetaCampo}>Email {marcaObligatorio}</label>
                 <input name="email" type="email" value={datos.email} onChange={manejarCambio} placeholder="example1@domain.com,example2@domain.com..." className={campoTexto} />
@@ -437,8 +437,8 @@ export default function VerificacionAlcoholDrogasForm() {
               </h2>
             </div>
 
-            <section className="mt-9 space-y-7">
-              <div>
+            <section className="mt-9 grid gap-5 md:grid-cols-2">
+              <div className="md:col-span-2">
                 <p className={etiquetaCampo}>Seleccione una opción {marcaObligatorio}</p>
                 <div className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900">
                   {(["INCOMINERIA", "OTRO"] as EmpresaPersona[]).map((opcion) => (
@@ -456,7 +456,7 @@ export default function VerificacionAlcoholDrogasForm() {
               </div>
 
               {datos.empresaPersonaEvaluada ? (
-                <div className="space-y-7">
+                <div className="grid gap-5 md:col-span-2 md:grid-cols-2">
                   <div>
                     <label className={etiquetaCampo}>Persona a la cual se le realiza la prueba {marcaObligatorio}</label>
                     <input name="personaPrueba" value={datos.personaPrueba} onChange={manejarCambio} className={campoTexto} />
@@ -527,29 +527,23 @@ export default function VerificacionAlcoholDrogasForm() {
                 </div>
               ) : null}
 
-              <div>
-                <p className={etiquetaCampo}>Firma {marcaObligatorio}</p>
-                <div className="mt-3 flex min-h-[190px] w-full max-w-[840px] items-center justify-center border border-dashed border-slate-500 bg-white">
-                  {datos.firmaPersonaEvaluada ? (
-                    <img src={datos.firmaPersonaEvaluada} alt="Firma registrada" className="max-h-[170px] w-full object-contain" />
-                  ) : (
-                    <span className="text-sm text-slate-400">Firma pendiente</span>
-                  )}
+              <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between md:col-span-2">
+                <div>
+                  <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
+                  <p className="mt-1 text-sm text-slate-600">{datos.firmaPersonaEvaluadaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
                 </div>
-                <div className="mt-3 flex justify-start">
-                  <button type="button" onClick={() => setModalFirmaAbierto(true)} className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white">
-                    {datos.firmaPersonaEvaluadaRegistrada ? "Editar firma" : "Clic para firmar"}
-                  </button>
-                </div>
+                <button type="button" onClick={() => setModalFirmaAbierto(true)} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                  Clic para firmar
+                </button>
               </div>
 
-              <p className="pt-4 text-base text-slate-950">
+              <p className="pt-4 text-base text-slate-950 md:col-span-2">
                 <span className="font-bold text-red-600">NOTA:</span> Será positivo cuando el resultado del{" "}
                 <span className="text-red-600">"Grado Detectado"</span> sea igual o mayor a{" "}
                 <span className="text-red-600">20mg / 100ml</span>
               </p>
 
-              <div className="flex justify-center py-4">
+              <div className="flex justify-center py-4 md:col-span-2">
                 <button
                   type="button"
                   onClick={agregarRegistro}
@@ -559,7 +553,7 @@ export default function VerificacionAlcoholDrogasForm() {
                 </button>
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <p className={etiquetaCampo}>¿ Hay testigo ?</p>
                 <div className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900">
                   {(["SI", "NO"] as RespuestaSiNo[]).map((opcion) => (
