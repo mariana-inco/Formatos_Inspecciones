@@ -83,6 +83,11 @@ const marcaObligatorio = <span className="text-red-600">*</span>;
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const soloDecimal = (value: string) => value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
+const enfocarCampoFaltante = (id: string) => {
+  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
+  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
+  campo?.focus({ preventScroll: true });
+};
 const camposSinNumeros = new Set<keyof DatosFormulario>([
   "nombreRealizaPrueba",
   "cargoRealizaPrueba",
@@ -168,7 +173,9 @@ export default function VerificacionAlcoholDrogasForm() {
     const svg = referenciaFirma.current?.svg;
     if (!svg) return;
     if (!firmaTieneTrazo) {
-      alert("Por favor registre la firma antes de guardar.");
+      const campoFirma = svg as unknown as HTMLElement;
+      campoFirma.scrollIntoView({ behavior: "smooth", block: "center" });
+      campoFirma.focus?.({ preventScroll: true });
       return;
     }
 
@@ -217,29 +224,39 @@ export default function VerificacionAlcoholDrogasForm() {
     referenciaFirma.current?.clear();
   };
 
+  const obtenerCamposFaltantesRegistro = () => {
+    const camposFaltantes: string[] = [];
+
+    if (!datos.email) camposFaltantes.push("email");
+    if (!datos.centroTrabajoSede) camposFaltantes.push("centroTrabajoSede");
+    if (!datos.tipoPrueba) camposFaltantes.push("tipoPrueba");
+    if (!datos.criteriosTomaMuestra) camposFaltantes.push("criteriosTomaMuestra");
+    if (!datos.equipoUtiliza) camposFaltantes.push("equipoUtiliza");
+    if (!datos.tipoIdentificacionRealizaPrueba) camposFaltantes.push("tipoIdentificacionRealizaPrueba");
+    if (!datos.identificacionRealizaPrueba) camposFaltantes.push("identificacionRealizaPrueba");
+    if (!datos.nombreRealizaPrueba) camposFaltantes.push("nombreRealizaPrueba");
+    if (!datos.cargoRealizaPrueba) camposFaltantes.push("cargoRealizaPrueba");
+    if (!datos.empresaPersonaEvaluada) camposFaltantes.push("empresaPersonaEvaluada");
+    if (!datos.personaPrueba) camposFaltantes.push("personaPrueba");
+    if (!datos.numeroIdentificacionPersona) camposFaltantes.push("numeroIdentificacionPersona");
+    if (!datos.empresaContratistaPersona) camposFaltantes.push("empresaContratistaPersona");
+    if (!datos.cargoPersona) camposFaltantes.push("cargoPersona");
+    if (!datos.resultadoPrimeraPruebaInicial) camposFaltantes.push("resultadoPrimeraPruebaInicial");
+    if (!datos.gradoDetectado) camposFaltantes.push("gradoDetectado");
+    if (!datos.firmaPersonaEvaluadaRegistrada) camposFaltantes.push("firmaPersonaEvaluada");
+    if (!datos.hayTestigo) camposFaltantes.push("hayTestigo");
+    if (datos.hayTestigo === "SI" && !datos.nombreTestigo) camposFaltantes.push("nombreTestigo");
+    if (datos.hayTestigo === "SI" && !datos.cargoTestigo) camposFaltantes.push("cargoTestigo");
+    if (!datos.confirmar) camposFaltantes.push("confirmar");
+
+    return camposFaltantes;
+  };
+
   const agregarRegistro = () => {
-    if (
-      !datos.email ||
-      !datos.centroTrabajoSede ||
-      !datos.tipoPrueba ||
-      !datos.criteriosTomaMuestra ||
-      !datos.equipoUtiliza ||
-      !datos.identificacionRealizaPrueba ||
-      !datos.nombreRealizaPrueba ||
-      !datos.cargoRealizaPrueba ||
-      !datos.empresaPersonaEvaluada ||
-      !datos.personaPrueba ||
-      !datos.numeroIdentificacionPersona ||
-      !datos.empresaContratistaPersona ||
-      !datos.cargoPersona ||
-      !datos.resultadoPrimeraPruebaInicial ||
-      !datos.gradoDetectado ||
-      !datos.hayTestigo ||
-      (datos.hayTestigo === "SI" && (!datos.nombreTestigo || !datos.cargoTestigo)) ||
-      !datos.confirmar ||
-      !datos.firmaPersonaEvaluadaRegistrada
-    ) {
-      alert("Complete los campos obligatorios y registre la firma antes de agregar.");
+    const camposFaltantes = obtenerCamposFaltantesRegistro();
+
+    if (camposFaltantes.length > 0) {
+      enfocarCampoFaltante(camposFaltantes[0]);
       return;
     }
 
@@ -321,12 +338,20 @@ export default function VerificacionAlcoholDrogasForm() {
 
   const enviarFormulario = async () => {
     if (registros.length === 0) {
-      alert("Agregue al menos un registro antes de enviar el formulario.");
+      const camposFaltantes = obtenerCamposFaltantesRegistro();
+
+      if (camposFaltantes.length > 0) {
+        enfocarCampoFaltante(camposFaltantes[0]);
+      } else {
+        enfocarCampoFaltante("agregarRegistroAlcoholDrogas");
+      }
       return;
     }
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F020?")) return;
     const respuestaJson = construirRespuestaJson();
+    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
+    console.log("JSON del formulario HSE-F020:", respuestaJsonFormateada);
 
     try {
       const respuestaHttp = await fetch("/api/formatos/verificacion-alcohol-drogas/respuestas", {
@@ -440,7 +465,7 @@ export default function VerificacionAlcoholDrogasForm() {
             <section className="mt-9 grid gap-5 md:grid-cols-2">
               <div className="md:col-span-2">
                 <p className={etiquetaCampo}>Seleccione una opción {marcaObligatorio}</p>
-                <div className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900">
+                <div data-required-id="empresaPersonaEvaluada" className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900" tabIndex={-1}>
                   {(["INCOMINERIA", "OTRO"] as EmpresaPersona[]).map((opcion) => (
                     <label key={opcion} className="inline-flex items-center gap-2">
                       <input
@@ -532,7 +557,7 @@ export default function VerificacionAlcoholDrogasForm() {
                   <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
                   <p className="mt-1 text-sm text-slate-600">{datos.firmaPersonaEvaluadaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
                 </div>
-                <button type="button" onClick={() => setModalFirmaAbierto(true)} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                <button type="button" onClick={() => setModalFirmaAbierto(true)} data-required-id="firmaPersonaEvaluada" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
                   Clic para firmar
                 </button>
               </div>
@@ -547,6 +572,7 @@ export default function VerificacionAlcoholDrogasForm() {
                 <button
                   type="button"
                   onClick={agregarRegistro}
+                  data-required-id="agregarRegistroAlcoholDrogas"
                   className="rounded-xl border border-slate-300 bg-slate-200 px-10 py-4 text-sm font-bold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-300"
                 >
                   {indiceEdicion !== null ? "Actualizar datos" : "Agregar datos"}
@@ -555,7 +581,7 @@ export default function VerificacionAlcoholDrogasForm() {
 
               <div className="md:col-span-2">
                 <p className={etiquetaCampo}>¿ Hay testigo ?</p>
-                <div className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900">
+                <div data-required-id="hayTestigo" className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900" tabIndex={-1}>
                   {(["SI", "NO"] as RespuestaSiNo[]).map((opcion) => (
                     <label key={opcion} className="inline-flex items-center gap-2">
                       <input

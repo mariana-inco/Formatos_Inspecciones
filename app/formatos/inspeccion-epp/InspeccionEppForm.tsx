@@ -64,6 +64,11 @@ const requiredMark = <span className="text-red-600">*</span>;
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const camposSinNumeros = new Set<keyof DatosFormulario>(["nombreColaborador", "cargoTrabajador"]);
 const opcionesCantidadOtrosEpps = Array.from({ length: 9 }, (_, index) => String(index + 1));
+const enfocarCampoFaltante = (id: string) => {
+  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
+  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
+  campo?.focus({ preventScroll: true });
+};
 const crearDetalleOtrosEpps = (cantidad: number, detalleActual: OtroEpp[] = []) =>
   Array.from({ length: cantidad }, (_, index) => detalleActual[index] ?? { cual: "", condicion: "" });
 
@@ -110,9 +115,29 @@ export default function InspeccionEppForm() {
     setIndiceEdicion(null);
   };
 
+  const obtenerCamposFaltantesRegistro = () => {
+    const camposFaltantes: string[] = [];
+
+    if (!datos.email) camposFaltantes.push("email");
+    if (!datos.fechaInspeccion) camposFaltantes.push("fechaInspeccion");
+    if (!datos.lugar) camposFaltantes.push("lugar");
+    if (!datos.areaTrabajo) camposFaltantes.push("areaTrabajo");
+    if (!datos.nombreColaborador) camposFaltantes.push("nombreColaborador");
+    if (!datos.cargoTrabajador) camposFaltantes.push("cargoTrabajador");
+
+    datos.otrosEppsDetalle.forEach((otroEpp, index) => {
+      if (!otroEpp.cual) camposFaltantes.push(`otroEppCual-${index}`);
+      if (!otroEpp.condicion) camposFaltantes.push(`otroEppCondicion-${index}`);
+    });
+
+    return camposFaltantes;
+  };
+
   const handleAgregarRegistro = () => {
-    if (!datos.email || !datos.fechaInspeccion || !datos.lugar || !datos.areaTrabajo || !datos.nombreColaborador || !datos.cargoTrabajador) {
-      alert("Complete los campos obligatorios antes de agregar el registro.");
+    const camposFaltantes = obtenerCamposFaltantesRegistro();
+
+    if (camposFaltantes.length > 0) {
+      enfocarCampoFaltante(camposFaltantes[0]);
       return;
     }
 
@@ -172,12 +197,20 @@ export default function InspeccionEppForm() {
 
   const handleEnviarFormulario = async () => {
     if (registros.length === 0) {
-      alert("Agregue al menos un registro de EPP antes de enviar el formulario.");
+      const camposFaltantes = obtenerCamposFaltantesRegistro();
+
+      if (camposFaltantes.length > 0) {
+        enfocarCampoFaltante(camposFaltantes[0]);
+      } else {
+        enfocarCampoFaltante("agregarRegistroEpp");
+      }
       return;
     }
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F002?")) return;
     const respuestaJson = buildRespuestaJson();
+    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
+    console.log("JSON del formulario HSE-F002:", respuestaJsonFormateada);
 
     try {
       const response = await fetch("/api/formatos/inspeccion-epp/respuestas", {
@@ -295,6 +328,7 @@ export default function InspeccionEppForm() {
                               <div>
                                 <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
                                 <input
+                                  data-required-id={`otroEppCual-${index}`}
                                   value={otroEpp.cual}
                                   onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
                                   placeholder={`Otro EPP ${index + 1}`}
@@ -304,6 +338,7 @@ export default function InspeccionEppForm() {
                               <div>
                                 <label className="text-sm font-semibold text-slate-700">Condición</label>
                                 <select
+                                  data-required-id={`otroEppCondicion-${index}`}
                                   value={otroEpp.condicion}
                                   onChange={(event) => handleOtroEppChange(index, "condicion", event.target.value)}
                                   className={selectClassName}
@@ -343,7 +378,7 @@ export default function InspeccionEppForm() {
               </div>
 
               <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <button type="button" onClick={handleAgregarRegistro} className="rounded-full bg-emerald-700 px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+                <button type="button" onClick={handleAgregarRegistro} data-required-id="agregarRegistroEpp" className="rounded-full bg-emerald-700 px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
                   {indiceEdicion !== null ? "Actualizar registro" : "Agregar"}
                 </button>
                 {indiceEdicion !== null ? (

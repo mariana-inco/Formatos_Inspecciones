@@ -65,6 +65,11 @@ type DatosFirma = {
 
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
+const enfocarCampoFaltante = (id: string) => {
+  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
+  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
+  campo?.focus({ preventScroll: true });
+};
 const camposFirmaNumericos = new Set<keyof DatosFirma>(["inspectorIdentificacion", "responsableIdentificacion"]);
 const camposFirmaSinNumeros = new Set<keyof DatosFirma>([
   "inspectorNombre",
@@ -140,7 +145,36 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     setUrlVistaPreviaImagen(URL.createObjectURL(archivo));
   };
 
-  const registrarDatosEquipo = () => setDatosRegistrados(true);
+  const obtenerCamposFaltantesDatosEquipo = () => {
+    const camposFaltantes: string[] = [];
+
+    if (!datosGenerales.email) camposFaltantes.push("Correo electrónico");
+    if (!datosGenerales.fechaInspeccion) camposFaltantes.push("Fecha de inspección");
+    if (!datosGenerales.fabricante) camposFaltantes.push("Fabricante");
+    if (!datosGenerales.modelo) camposFaltantes.push("Modelo");
+    if (!datosGenerales.numeroSerie) camposFaltantes.push("Número de serie");
+    if (!datosGenerales.numeroInterno) camposFaltantes.push("Número interno");
+    if (!datosGenerales.periodicidad) camposFaltantes.push("Periodicidad");
+    if (!datosGenerales.fechaFabricacion) camposFaltantes.push("Fecha de fabricación");
+    if (!datosGenerales.certificado) camposFaltantes.push("Certificado");
+    if (!datosGenerales.fechaCompra) camposFaltantes.push("Fecha de compra");
+    if (!datosGenerales.numeroLote) camposFaltantes.push("Número de lote");
+    if (!datosGenerales.tipoFreno) camposFaltantes.push("Tipo de freno");
+    if (!datosGenerales.fechaPrimeraUtilizacion) camposFaltantes.push("Fecha primera utilización");
+
+    return camposFaltantes;
+  };
+
+  const registrarDatosEquipo = () => {
+    const camposFaltantes = obtenerCamposFaltantesDatosEquipo();
+
+    if (camposFaltantes.length > 0) {
+      enfocarCampoFaltante(camposFaltantes[0]);
+      return;
+    }
+
+    setDatosRegistrados(true);
+  };
 
   const limpiarFirma = () => {
     referenciaFirma.current?.clear();
@@ -151,7 +185,9 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     const svg = referenciaFirma.current?.svg;
     if (!svg || !rolModalFirma) return;
     if (!firmaTieneTrazo) {
-      alert("Por favor registre la firma antes de guardar.");
+      const campoFirma = svg as unknown as HTMLElement;
+      campoFirma.scrollIntoView({ behavior: "smooth", block: "center" });
+      campoFirma.focus?.({ preventScroll: true });
       return;
     }
     const firmaSerializada = new XMLSerializer().serializeToString(svg);
@@ -189,7 +225,10 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
   const agregarDatosAdicionales = () => {
     if (!primeraTablaCompleta) {
-      alert("Complete la columna CONCEPTO de la primera tabla antes de agregar datos.");
+      const conceptosFaltantes = listaChequeoActual
+        .filter((item) => !respuestasListaChequeo[item.key]?.concepto)
+        .map((item) => `concepto-${item.key}`);
+      enfocarCampoFaltante(conceptosFaltantes[0]);
       return;
     }
 
@@ -261,23 +300,38 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     };
   };
 
+  const obtenerCamposFaltantesEnvio = () => {
+    const camposFaltantes = obtenerCamposFaltantesDatosEquipo();
+
+    if (!datosRegistrados) camposFaltantes.push("agregarDatosEquipo");
+    listaChequeoActual.forEach((item) => {
+      if (!respuestasListaChequeo[item.key]?.concepto) camposFaltantes.push(`concepto-${item.key}`);
+    });
+    if (!decisionFinal) camposFaltantes.push("decisionFinal");
+    if (!firmas.inspectorIdentificacion) camposFaltantes.push("inspectorIdentificacion");
+    if (!firmas.inspectorNombre) camposFaltantes.push("inspectorNombre");
+    if (!firmas.inspectorCargo) camposFaltantes.push("inspectorCargo");
+    if (!firmas.inspectorFirmado) camposFaltantes.push("inspectorFirma");
+    if (!firmas.responsableIdentificacion) camposFaltantes.push("responsableIdentificacion");
+    if (!firmas.responsableNombre) camposFaltantes.push("responsableNombre");
+    if (!firmas.responsableCargo) camposFaltantes.push("responsableCargo");
+    if (!firmas.responsableFirmado) camposFaltantes.push("responsableFirma");
+
+    return camposFaltantes;
+  };
+
   const enviarFormulario = async () => {
-    if (
-      !firmas.inspectorIdentificacion ||
-      !firmas.inspectorNombre ||
-      !firmas.inspectorCargo ||
-      !firmas.inspectorFirmado ||
-      !firmas.responsableNombre ||
-      !firmas.responsableIdentificacion ||
-      !firmas.responsableCargo ||
-      !firmas.responsableFirmado
-    ) {
-      alert("Complete los campos obligatorios y registre ambas firmas antes de enviar el formulario.");
+    const camposFaltantes = obtenerCamposFaltantesEnvio();
+
+    if (camposFaltantes.length > 0) {
+      enfocarCampoFaltante(camposFaltantes[0]);
       return;
     }
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F006?")) return;
     const respuestaJson = construirRespuestaJson();
+    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
+    console.log("JSON del formulario HSE-F006:", respuestaJsonFormateada);
 
     try {
       const respuestaHttp = await fetch("/api/formatos/inspeccion-contra-caidas/respuestas", {
@@ -339,6 +393,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <td className="px-4 py-3 align-top">
                   {opciones.mode === "principal" ? (
                     <select
+                      data-required-id={`concepto-${item.key}`}
                       value={concepto}
                       onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
                       className="mx-auto block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
@@ -544,7 +599,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               </section>
 
               <div className="mt-6 flex justify-start">
-                <button type="button" onClick={registrarDatosEquipo} className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-semibold text-white">Agregar Datos</button>
+                <button type="button" onClick={registrarDatosEquipo} data-required-id="agregarDatosEquipo" className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-semibold text-white">Agregar Datos</button>
               </div>
             </div>
 
@@ -711,6 +766,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div>
                   <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación {marcaObligatorio}</label>
                   <input
+                    data-required-id="inspectorIdentificacion"
                     value={firmas.inspectorIdentificacion}
                     onChange={(e) => manejarCambioCampoFirma("inspectorIdentificacion", e.target.value)}
                     inputMode="numeric"
@@ -722,6 +778,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div>
                   <label className="text-xs font-bold italic uppercase text-slate-900">Nombre {marcaObligatorio}</label>
                   <input
+                    data-required-id="inspectorNombre"
                     value={firmas.inspectorNombre}
                     onChange={(e) => manejarCambioCampoFirma("inspectorNombre", e.target.value)}
                     required
@@ -731,6 +788,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div>
                   <label className="text-xs font-bold italic uppercase text-slate-900">Cargo {marcaObligatorio}</label>
                   <input
+                    data-required-id="inspectorCargo"
                     value={firmas.inspectorCargo}
                     onChange={(e) => manejarCambioCampoFirma("inspectorCargo", e.target.value)}
                     required
@@ -742,7 +800,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                     <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
                     <p className="mt-1 text-sm text-slate-600">{firmas.inspectorFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
                   </div>
-                  <button type="button" onClick={() => abrirModalFirma("inspector")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                  <button type="button" onClick={() => abrirModalFirma("inspector")} data-required-id="inspectorFirma" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
                     Clic para firmar
                   </button>
                 </div>
@@ -759,6 +817,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div>
                   <label className="text-xs font-bold italic uppercase text-slate-900">Número de identificación {marcaObligatorio}</label>
                   <input
+                    data-required-id="responsableIdentificacion"
                     value={firmas.responsableIdentificacion}
                     onChange={(e) => manejarCambioCampoFirma("responsableIdentificacion", e.target.value)}
                     inputMode="numeric"
@@ -770,6 +829,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div>
                   <label className="text-xs font-bold italic uppercase text-slate-900">Nombre {marcaObligatorio}</label>
                   <input
+                    data-required-id="responsableNombre"
                     value={firmas.responsableNombre}
                     onChange={(e) => manejarCambioCampoFirma("responsableNombre", e.target.value)}
                     required
@@ -779,6 +839,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div>
                   <label className="text-xs font-bold italic uppercase text-slate-900">Cargo {marcaObligatorio}</label>
                   <input
+                    data-required-id="responsableCargo"
                     value={firmas.responsableCargo}
                     onChange={(e) => manejarCambioCampoFirma("responsableCargo", e.target.value)}
                     required
@@ -790,7 +851,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                     <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
                     <p className="mt-1 text-sm text-slate-600">{firmas.responsableFirmado ? "Firma registrada" : "Pendiente de firma"}</p>
                   </div>
-                  <button type="button" onClick={() => abrirModalFirma("responsable")} className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                  <button type="button" onClick={() => abrirModalFirma("responsable")} data-required-id="responsableFirma" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
                     Clic para firmar
                   </button>
                 </div>

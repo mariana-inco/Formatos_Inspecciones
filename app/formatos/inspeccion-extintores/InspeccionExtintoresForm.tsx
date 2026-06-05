@@ -111,6 +111,11 @@ const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const mostrarValor = (value: string) => value || "N/A";
 const mostrarEstado = (value: EstadoRevision) => (value === "NO APLICA" || !value ? "N/A" : value);
+const enfocarCampoFaltante = (id: string) => {
+  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
+  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
+  campo?.focus({ preventScroll: true });
+};
 const claseEstadoComponente = (value: EstadoRevision) => {
   if (value === "BUENO") return "bg-emerald-500 text-white";
   if (value === "REGULAR") return "bg-amber-500 text-white";
@@ -165,7 +170,9 @@ export default function InspeccionExtintoresForm() {
     const svg = referenciaFirma.current?.svg;
     if (!svg) return;
     if (!firmaTieneTrazo) {
-      alert("Por favor registre la firma antes de guardar.");
+      const campoFirma = svg as unknown as HTMLElement;
+      campoFirma.scrollIntoView({ behavior: "smooth", block: "center" });
+      campoFirma.focus?.({ preventScroll: true });
       return;
     }
 
@@ -181,27 +188,34 @@ export default function InspeccionExtintoresForm() {
     setIndiceEdicion(null);
   };
 
+  const obtenerCamposFaltantesRegistro = () => {
+    const camposFaltantes: string[] = [];
+
+    if (!datosInspeccion.email) camposFaltantes.push("email");
+    if (!datosInspeccion.sedeCentroTrabajo) camposFaltantes.push("sedeCentroTrabajo");
+    if (!datosInspeccion.responsableInspeccion) camposFaltantes.push("responsableInspeccion");
+    if (!datosInspeccion.cargoResponsable) camposFaltantes.push("cargoResponsable");
+    if (!datosInspeccion.equipoInterno && !datosInspeccion.equipoExterno) camposFaltantes.push("equipoInterno");
+    if (!datosInspeccion.firmaRegistrada) camposFaltantes.push("firmaResponsable");
+    if (!registro.numeroExtintor) camposFaltantes.push("numeroExtintor");
+    if (!registro.ubicacion) camposFaltantes.push("ubicacion");
+    if (!registro.capacidad) camposFaltantes.push("capacidad");
+    if (!registro.agente) camposFaltantes.push("agente");
+    if (!registro.clase) camposFaltantes.push("clase");
+    if (!registro.fechaUltimaRecarga) camposFaltantes.push("fechaUltimaRecarga");
+    if (!registro.fechaProximaRecarga) camposFaltantes.push("fechaProximaRecarga");
+    camposRevision.forEach((campo) => {
+      if (!registro[campo.key]) camposFaltantes.push(String(campo.key));
+    });
+
+    return camposFaltantes;
+  };
+
   const agregarRegistro = () => {
-    const datosCompletos =
-      datosInspeccion.email &&
-      datosInspeccion.sedeCentroTrabajo &&
-      datosInspeccion.responsableInspeccion &&
-      datosInspeccion.cargoResponsable &&
-      (datosInspeccion.equipoInterno || datosInspeccion.equipoExterno) &&
-      datosInspeccion.firmaRegistrada;
+    const camposFaltantes = obtenerCamposFaltantesRegistro();
 
-    const registroCompleto =
-      registro.numeroExtintor &&
-      registro.capacidad &&
-      registro.agente &&
-      registro.clase &&
-      registro.ubicacion &&
-      registro.fechaUltimaRecarga &&
-      registro.fechaProximaRecarga &&
-      camposRevision.every((campo) => Boolean(registro[campo.key]));
-
-    if (!datosCompletos || !registroCompleto) {
-      alert("Complete los datos obligatorios, registre la firma y diligencie la inspección del extintor antes de agregar.");
+    if (camposFaltantes.length > 0) {
+      enfocarCampoFaltante(camposFaltantes[0]);
       return;
     }
 
@@ -263,7 +277,13 @@ export default function InspeccionExtintoresForm() {
 
   const enviarFormulario = async () => {
     if (registros.length === 0) {
-      alert("Agregue al menos un registro de extintor antes de enviar el formulario.");
+      const camposFaltantes = obtenerCamposFaltantesRegistro();
+
+      if (camposFaltantes.length > 0) {
+        enfocarCampoFaltante(camposFaltantes[0]);
+      } else {
+        enfocarCampoFaltante("agregarRegistro");
+      }
       return;
     }
 
@@ -362,6 +382,7 @@ export default function InspeccionExtintoresForm() {
                   setFirmaTieneTrazo(false);
                   setModalFirmaAbierto(true);
                 }}
+                data-required-id="firmaResponsable"
                 className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
               >
                 Clic para firmar
@@ -425,7 +446,7 @@ export default function InspeccionExtintoresForm() {
             </div>
 
             <div className="flex justify-center py-4">
-              <button type="button" onClick={agregarRegistro} className="rounded bg-emerald-900 px-8 py-3 text-sm font-bold uppercase tracking-[0.2em] text-white shadow-md transition hover:bg-emerald-800">
+              <button type="button" onClick={agregarRegistro} data-required-id="agregarRegistro" className="rounded bg-emerald-900 px-8 py-3 text-sm font-bold uppercase tracking-[0.2em] text-white shadow-md transition hover:bg-emerald-800">
                 {indiceEdicion !== null ? "Actualizar registro" : "Agregar registro"}
               </button>
             </div>
