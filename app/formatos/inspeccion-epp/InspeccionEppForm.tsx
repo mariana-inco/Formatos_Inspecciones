@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import Signature from "@uiw/react-signature";
+import type { SignatureRef } from "@uiw/react-signature";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
 import type { CampoEppKey, CondicionEpp } from "./data";
 
@@ -20,6 +22,8 @@ type DatosFormulario = {
   otrosEpps: string;
   otrosEppsDetalle: OtroEpp[];
   observaciones: string;
+  firmaColaborador: string;
+  firmaRegistrada: boolean;
 } & Record<Exclude<CampoEppKey, "otrosEpps">, CondicionEpp>;
 
 type RegistroEpp = DatosFormulario;
@@ -52,6 +56,8 @@ const datosIniciales: DatosFormulario = {
   otrosEpps: "",
   otrosEppsDetalle: [],
   observaciones: "",
+  firmaColaborador: "",
+  firmaRegistrada: false,
 };
 
 const dateInputClassName =
@@ -71,11 +77,27 @@ const enfocarCampoFaltante = (id: string) => {
 };
 const crearDetalleOtrosEpps = (cantidad: number, detalleActual: OtroEpp[] = []) =>
   Array.from({ length: cantidad }, (_, index) => detalleActual[index] ?? { cual: "", condicion: "" });
+const serializarFirma = (svg: SVGSVGElement) => {
+  const firmaClonada = svg.cloneNode(true) as SVGSVGElement;
+  const rect = svg.getBoundingClientRect();
+  const ancho = Math.max(Math.round(svg.clientWidth || rect.width || 600), 600);
+  const alto = Math.max(Math.round(svg.clientHeight || rect.height || 220), 220);
+
+  firmaClonada.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  firmaClonada.setAttribute("width", String(ancho));
+  firmaClonada.setAttribute("height", String(alto));
+  if (!firmaClonada.getAttribute("viewBox")) firmaClonada.setAttribute("viewBox", `0 0 ${ancho} ${alto}`);
+
+  return new XMLSerializer().serializeToString(firmaClonada);
+};
 
 export default function InspeccionEppForm() {
   const [datos, setDatos] = useState<DatosFormulario>(datosIniciales);
   const [registros, setRegistros] = useState<RegistroEpp[]>([]);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
+  const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
+  const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
+  const referenciaFirma = useRef<SignatureRef>(null);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -113,6 +135,30 @@ export default function InspeccionEppForm() {
       areaTrabajo: prev.areaTrabajo,
     }));
     setIndiceEdicion(null);
+    setFirmaTieneTrazo(false);
+    referenciaFirma.current?.clear();
+  };
+
+  const limpiarFirma = () => {
+    referenciaFirma.current?.clear();
+    setFirmaTieneTrazo(false);
+  };
+
+  const guardarFirma = () => {
+    const svg = referenciaFirma.current?.svg;
+    if (!svg) return;
+    if (!firmaTieneTrazo) {
+      const campoFirma = svg as unknown as HTMLElement;
+      campoFirma.scrollIntoView({ behavior: "smooth", block: "center" });
+      campoFirma.focus?.({ preventScroll: true });
+      return;
+    }
+
+    const firmaSerializada = serializarFirma(svg);
+    const firmaComoUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(firmaSerializada)}`;
+    setDatos((prev) => ({ ...prev, firmaColaborador: firmaComoUrl, firmaRegistrada: true }));
+    setModalFirmaAbierto(false);
+    setFirmaTieneTrazo(false);
   };
 
   const obtenerCamposFaltantesRegistro = () => {
@@ -124,6 +170,7 @@ export default function InspeccionEppForm() {
     if (!datos.areaTrabajo) camposFaltantes.push("areaTrabajo");
     if (!datos.nombreColaborador) camposFaltantes.push("nombreColaborador");
     if (!datos.cargoTrabajador) camposFaltantes.push("cargoTrabajador");
+    if (!datos.firmaRegistrada) camposFaltantes.push("firmaColaborador");
 
     datos.otrosEppsDetalle.forEach((otroEpp, index) => {
       if (!otroEpp.cual) camposFaltantes.push(`otroEppCual-${index}`);
@@ -192,6 +239,10 @@ export default function InspeccionEppForm() {
         detalle: registro.otrosEppsDetalle,
       },
       observaciones: registro.observaciones,
+      firma: {
+        registrada: registro.firmaRegistrada,
+        dataUrl: registro.firmaColaborador,
+      },
     })),
   });
 
@@ -375,6 +426,24 @@ export default function InspeccionEppForm() {
                   <label className="text-sm font-semibold text-slate-700">Observaciones</label>
                   <textarea name="observaciones" value={datos.observaciones} onChange={handleChange} rows={3} placeholder="Registre observaciones si aplica" className={fieldClassName} />
                 </div>
+
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between md:col-span-2">
+                  <div>
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma {requiredMark}</p>
+                    <p className="mt-1 text-sm text-slate-600">{datos.firmaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFirmaTieneTrazo(false);
+                      setModalFirmaAbierto(true);
+                    }}
+                    data-required-id="firmaColaborador"
+                    className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+                  >
+                    Clic para firmar
+                  </button>
+                </div>
               </div>
 
               <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -417,6 +486,9 @@ export default function InspeccionEppForm() {
                   <th rowSpan={2} className="w-[220px] border border-white/40 px-3 py-4 text-center uppercase">
                     Observaciones
                   </th>
+                  <th rowSpan={2} className="w-[180px] border border-white/40 px-3 py-4 text-center uppercase">
+                    Firma
+                  </th>
                   <th rowSpan={2} className="w-[110px] border border-white/40 px-3 py-4 text-center uppercase">
                     Acción
                   </th>
@@ -434,7 +506,7 @@ export default function InspeccionEppForm() {
               <tbody className="divide-y divide-slate-200 bg-white text-slate-800">
                 {registros.length === 0 ? (
                   <tr>
-                    <td colSpan={camposEpp.length + 3} className="px-4 py-8 text-center text-sm text-slate-500">
+                    <td colSpan={camposEpp.length + 4} className="px-4 py-8 text-center text-sm text-slate-500">
                       Aún no hay registros agregados.
                     </td>
                   </tr>
@@ -462,6 +534,15 @@ export default function InspeccionEppForm() {
                         })
                       )}
                       <td className="border border-slate-200 px-3 py-3 align-top">{registro.observaciones || "-"}</td>
+                      <td className="border border-slate-200 p-0">
+                        {registro.firmaColaborador ? (
+                          <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
+                            <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
+                          </div>
+                        ) : (
+                          <div className="px-3 py-3 text-center text-slate-500">Pendiente</div>
+                        )}
+                      </td>
                       <td className="border border-slate-200 px-3 py-3 text-center">
                         <div className="flex justify-center gap-2">
                           <button type="button" onClick={() => handleEditarRegistro(index)} className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
@@ -487,6 +568,52 @@ export default function InspeccionEppForm() {
         </div>
 
       </div>
+
+      {modalFirmaAbierto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6">
+          <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-2xl">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-700">Firma digital</p>
+                <h3 className="mt-1 text-xl font-semibold text-slate-950">Colaborador inspeccionado</h3>
+              </div>
+              <button type="button" onClick={() => setModalFirmaAbierto(false)} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <label className="text-xs font-bold italic uppercase text-slate-950">Firma</label>
+              <Signature
+                ref={referenciaFirma}
+                fill="#0f172a"
+                onPointer={(points) => {
+                  if (points.length > 0) setFirmaTieneTrazo(true);
+                }}
+                options={{
+                  size: 5,
+                  thinning: 0.45,
+                  smoothing: 0.5,
+                  streamline: 0.5,
+                }}
+                className="mt-2 h-[220px] w-full rounded-lg border border-dashed border-slate-400 bg-white"
+              />
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={limpiarFirma} className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700">
+                Limpiar
+              </button>
+              <button type="button" onClick={() => setModalFirmaAbierto(false)} className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700">
+                Cancelar
+              </button>
+              <button type="button" onClick={guardarFirma} className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white">
+                Guardar firma
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

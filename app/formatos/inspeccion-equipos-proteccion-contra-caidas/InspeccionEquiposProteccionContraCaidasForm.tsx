@@ -358,66 +358,69 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     mode: "principal" | "adicional";
     detailTitle: string;
   }) => (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200 text-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[920px] table-fixed border-separate border-spacing-0 text-sm">
         <colgroup>
-          <col className="w-[52%]" />
-          <col className="w-[18%]" />
-          <col className="w-[30%]" />
+          <col className="w-[54%]" />
+          <col className="w-[17%]" />
+          <col className="w-[29%]" />
         </colgroup>
         <thead className="bg-emerald-900 text-left text-white">
           <tr>
-            <th className="px-4 py-4">FACTORES GENERALES</th>
-            <th className="px-6 py-4 text-center">CONCEPTO</th>
-            <th className="px-4 py-4">{opciones.detailTitle}</th>
+            <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide">FACTORES GENERALES</th>
+            <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide">CONCEPTO</th>
+            <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide">{opciones.detailTitle}</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200 bg-slate-50">
+        <tbody className="bg-white">
           {opciones.items.map((item) => {
             const concepto = respuestasListaChequeo[item.key]?.concepto || "";
 
             return (
-              <tr key={`${opciones.mode}-${item.key}`} className="border-b border-slate-200">
-                <td className="px-4 py-3 align-top">
-                  <div className="text-xs font-semibold text-slate-950">{item.factor}</div>
+              <tr key={`${opciones.mode}-${item.key}`} className="border-b border-slate-200 transition hover:bg-emerald-50/40">
+                <td className="border-b border-slate-200 px-5 py-4 align-top">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-sm font-bold leading-5 text-slate-950">{item.factor}</div>
                   {Array.isArray(item.instrucciones) ? (
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-800">
+                    <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-5 text-slate-700">
                       {item.instrucciones.map((instruccion) => (
                         <li key={instruccion}>{instruccion}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-xs leading-5 text-slate-800">{item.instrucciones}</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-700">{item.instrucciones}</p>
                   )}
+                  </div>
                 </td>
-                <td className="px-4 py-3 align-top">
+                <td className="border-b border-slate-200 px-4 py-4 align-top">
                   {opciones.mode === "principal" ? (
                     <select
                       data-required-id={`concepto-${item.key}`}
                       value={concepto}
                       onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
-                      className="mx-auto block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      className="mx-auto block h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-center text-xs font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                     >
                       <option value="">--Seleccione--</option>
                       <option value="ACEPTADO">ACEPTADO</option>
                       <option value="RECHAZADO">RECHAZADO</option>
                     </select>
                   ) : (
-                    <div className="mx-auto flex h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm">
+                    <div className="mx-auto flex h-11 w-full items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-bold text-emerald-950 shadow-sm">
                       {concepto || "-"}
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 align-top">
+                <td className="border-b border-slate-200 px-5 py-4 align-top">
                   {opciones.mode === "principal" ? (
                     <input
                       value={respuestasListaChequeo[item.key]?.comentario || ""}
                       onChange={(e) => manejarCambioComentario(item.key, e.target.value)}
-                      className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      className="block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
                       placeholder="Solo si aplica"
                     />
                   ) : (
-                    <div className="flex min-h-10 w-full items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm">
+                    <div className="flex min-h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-900 shadow-sm">
                       {respuestasListaChequeo[item.key]?.comentario || ""}
                     </div>
                   )}
@@ -427,6 +430,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 
@@ -509,19 +513,19 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Fabricante {marcaObligatorio}</label>
-                    <input name="fabricante" value={datosGenerales.fabricante} onChange={manejarCambioCampo} placeholder="Ej: Petzl" className={claseCampoTexto} />
+                    <input name="fabricante" value={datosGenerales.fabricante} onChange={manejarCambioCampo} placeholder="Ej: 3M SERIE ARSEG" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Modelo {marcaObligatorio}</label>
-                    <input name="modelo" value={datosGenerales.modelo} onChange={manejarCambioCampo} placeholder="Ej: ASAP LOCK" className={claseCampoTexto} />
+                    <input name="modelo" value={datosGenerales.modelo} onChange={manejarCambioCampo} placeholder="Ej: 1170121" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Número de serie {marcaObligatorio}</label>
-                    <input name="numeroSerie" value={datosGenerales.numeroSerie} onChange={manejarCambioCampo} placeholder="Ej: SN-000123" className={claseCampoTexto} />
+                    <input name="numeroSerie" value={datosGenerales.numeroSerie} onChange={manejarCambioCampo} placeholder="Ej: 454580104" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Número interno {marcaObligatorio}</label>
-                    <input name="numeroInterno" value={datosGenerales.numeroInterno} onChange={manejarCambioCampo} placeholder="Ej: EQ-045" className={claseCampoTexto} />
+                    <input name="numeroInterno" value={datosGenerales.numeroInterno} onChange={manejarCambioCampo} placeholder="Ej: N/A" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Certificado</label>
@@ -529,7 +533,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Número de lote</label>
-                    <input name="numeroLote" value={datosGenerales.numeroLote} onChange={manejarCambioCampo} placeholder="Ej: LOTE-2026-01" className={claseCampoTexto} />
+                    <input name="numeroLote" value={datosGenerales.numeroLote} onChange={manejarCambioCampo} placeholder="Ej: 454580104" className={claseCampoTexto} />
                   </div>
                 </div>
               </section>
@@ -679,10 +683,10 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           </div>
         )}
 
-        <div className="border-t border-slate-200 bg-slate-100 px-6 py-6 mt-6">
-          <div className="rounded-[1.75rem] bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-slate-950">{tiposInspeccion[tipoInspeccionSeleccionado].label}</h2>
+        <div className="mt-6 border-t border-slate-200 bg-slate-100 px-3 py-5 sm:px-6 sm:py-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="mb-5 border-l-4 border-emerald-700 pl-4">
+              <h2 className="text-lg font-bold uppercase tracking-wide text-slate-950 sm:text-xl">{tiposInspeccion[tipoInspeccionSeleccionado].label}</h2>
             </div>
 
             {!mostrarDatosAdicionales ? (
@@ -693,50 +697,40 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   detailTitle: "DETALLES DE APOYO / COMENTARIOS",
                 })}
 
-                <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200 text-sm">
-                    <colgroup>
-                      <col className="w-[52%]" />
-                      <col className="w-[48%]" />
-                    </colgroup>
-                    <tbody className="divide-y divide-slate-200 bg-slate-50">
-                      <tr>
-                        <td className="px-4 py-4 align-middle text-xs font-medium uppercase text-slate-950">COMENTARIOS</td>
-                        <td className="px-4 py-3 align-middle">
-                          <input
-                            value={comentariosFinales}
-                            onChange={(e) => setComentariosFinales(e.target.value)}
-                            className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                          />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-4 align-middle text-xs font-medium uppercase text-slate-950">DECISIÓN FINAL</td>
-                        <td className="px-4 py-3 text-center align-middle">
-                          <select
-                            name="decisionFinal"
-                            value={decisionFinal}
-                            onChange={manejarCambioCampo}
-                            className="mx-auto block h-10 w-full max-w-[300px] rounded-lg border border-slate-300 bg-white px-4 text-sm text-slate-900 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                          >
-                            {opcionesDecision.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="mt-6 rounded-2xl border border-emerald-100 bg-slate-50 p-4 shadow-sm">
+                  <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wide text-slate-950">COMENTARIOS</label>
+                      <input
+                        value={comentariosFinales}
+                        onChange={(e) => setComentariosFinales(e.target.value)}
+                        className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wide text-slate-950">DECISIÓN FINAL</label>
+                      <select
+                        name="decisionFinal"
+                        value={decisionFinal}
+                        onChange={manejarCambioCampo}
+                        className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      >
+                        {opcionesDecision.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-4 flex justify-center">
+                <div className="mt-5 flex justify-center">
                   <button
                     type="button"
                     onClick={agregarDatosAdicionales}
                     disabled={!primeraTablaCompleta}
-                    className={`rounded-lg px-5 py-3 text-xs font-semibold uppercase shadow-sm transition ${
+                    className={`rounded-full px-8 py-3 text-xs font-bold uppercase tracking-wide shadow-sm transition ${
                       primeraTablaCompleta
-                        ? "bg-emerald-700 text-white hover:bg-emerald-800"
+                        ? "bg-emerald-700 text-white shadow-emerald-900/10 hover:bg-emerald-800"
                         : "cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500"
                     }`}
                   >
@@ -745,7 +739,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 </div>
               </>
             ) : (
-              <div className="mt-6">
+              <div className="mt-2">
                 {renderizarTablaListaChequeo({
                   items: listaChequeoActual,
                   mode: "adicional",
