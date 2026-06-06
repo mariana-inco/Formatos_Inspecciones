@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
-import { CalendarDays, ClipboardList, ImageUp, PenLine, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, Check, ClipboardList, ImageUp, PenLine, Settings, ShieldCheck } from "lucide-react";
 import {
   decisionOptions as opcionesDecision,
   inspectionTypeKeys as clavesTiposInspeccion,
@@ -110,6 +110,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [nombreImagen, setNombreImagen] = useState("");
   const [datosRegistrados, setDatosRegistrados] = useState(false);
   const [tipoInspeccionSeleccionado, setTipoInspeccionSeleccionado] = useState(clavesTiposInspeccion[0]);
+  const [selectorInspeccionContraido, setSelectorInspeccionContraido] = useState(false);
   const [decisionFinal, setDecisionFinal] = useState("");
   const [comentariosFinales, setComentariosFinales] = useState("");
   const [respuestasListaChequeo, setRespuestasListaChequeo] = useState<Record<string, RespuestaListaChequeo>>({});
@@ -225,6 +226,16 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     setMostrarDatosAdicionales(false);
     setComentariosFinales("");
     setDecisionFinal("");
+  };
+
+  const manejarSeleccionTipoInspeccion = (tipo: ClaveTipoInspeccion) => {
+    if (selectorInspeccionContraido && tipo === tipoInspeccionSeleccionado) {
+      setSelectorInspeccionContraido(false);
+      return;
+    }
+
+    seleccionarTipoInspeccion(tipo);
+    setSelectorInspeccionContraido(true);
   };
 
   const agregarDatosAdicionales = () => {
@@ -523,25 +534,35 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap justify-center gap-3 border-t-2 border-blue-500 pt-8">
-          {clavesTiposInspeccion.map((tipo) => {
+        <div className="mb-6 grid grid-cols-2 gap-3 border-t-2 border-blue-500 pt-8 md:grid-cols-4">
+          {(selectorInspeccionContraido ? [tipoInspeccionSeleccionado] : clavesTiposInspeccion).map((tipo) => {
             const estaSeleccionado = tipoInspeccionSeleccionado === tipo;
             return (
               <button
                 key={tipo}
                 type="button"
-                onClick={() => seleccionarTipoInspeccion(tipo)}
+                onClick={() => manejarSeleccionTipoInspeccion(tipo)}
                 aria-pressed={estaSeleccionado}
-                className={`flex min-h-[60px] w-[170px] items-center justify-center gap-3 rounded-lg border px-3 py-3 text-xs font-bold uppercase text-white shadow-sm transition ${
+                className={`relative flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border px-2.5 py-3 text-center text-[13px] font-bold uppercase text-white shadow-sm transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 md:min-h-[92px] md:px-3 ${
                   estaSeleccionado
-                    ? "border-emerald-500 bg-emerald-800 ring-2 ring-emerald-300"
+                    ? "border-emerald-500 bg-emerald-800 text-white ring-2 ring-emerald-300"
                     : "border-slate-800 bg-slate-800 hover:bg-slate-700"
                 }`}
               >
-                <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-md bg-slate-950/20 text-2xl leading-none">
+                {estaSeleccionado ? (
+                  <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-full bg-white text-emerald-800 shadow-sm" aria-hidden="true">
+                    <Check className="size-3.5" />
+                  </span>
+                ) : null}
+                <span
+                  aria-hidden="true"
+                  className={`grid size-11 shrink-0 place-items-center rounded-full text-2xl leading-none ${
+                    estaSeleccionado ? "bg-white/15" : "bg-slate-950/25"
+                  }`}
+                >
                   <Image src={imagenesBotonesInspeccion[tipo]} alt="" width={28} height={28} className="size-7 object-contain" />
                 </span>
-                <span className="leading-5">{etiquetasBotonesInspeccion[tipo]}</span>
+                <span className="line-clamp-2 max-w-full leading-4 [text-wrap:balance]">{etiquetasBotonesInspeccion[tipo]}</span>
               </button>
             );
           })}
