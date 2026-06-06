@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
+import { CalendarDays, ClipboardList, ImageUp, PenLine, Settings, ShieldCheck } from "lucide-react";
 import {
   decisionOptions as opcionesDecision,
   inspectionTypeKeys as clavesTiposInspeccion,
@@ -36,11 +37,14 @@ const METADATOS_FORMATO = {
 };
 
 const claseCampoFecha =
-  "date-input mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "date-input mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const claseCampoTexto =
-  "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const claseCampoSeleccion =
-  "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
+const encabezadoSeccion = "flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
 
 type ConceptoRevision = "" | "ACEPTADO" | "RECHAZADO";
@@ -494,9 +498,14 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <p className="mt-1 text-sm text-slate-600">Complete la información básica antes de iniciar la inspección técnica.</p>
               </div>
 
-              <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Datos generales</h3>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <section className={tarjetaSeccion}>
+                <div className={encabezadoSeccion}>
+                  <div className={iconoSeccion}>
+                    <ShieldCheck className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Datos generales</h3>
+                </div>
+                <div className="grid gap-4 p-5 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Correo electrónico {marcaObligatorio}</label>
                     <input name="email" type="email" value={datosGenerales.email} onChange={manejarCambioCampo} placeholder="usuario@empresa.com" className={claseCampoTexto} />
@@ -508,9 +517,14 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 </div>
               </section>
 
-              <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Identificación del equipo</h3>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <section className={`${tarjetaSeccion} mt-5`}>
+                <div className={encabezadoSeccion}>
+                  <div className={iconoSeccion}>
+                    <ClipboardList className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Identificación del equipo</h3>
+                </div>
+                <div className="grid gap-4 p-5 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Fabricante {marcaObligatorio}</label>
                     <input name="fabricante" value={datosGenerales.fabricante} onChange={manejarCambioCampo} placeholder="Ej: 3M SERIE ARSEG" className={claseCampoTexto} />
@@ -538,9 +552,14 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 </div>
               </section>
 
-              <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Fechas del equipo</h3>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <section className={`${tarjetaSeccion} mt-5`}>
+                <div className={encabezadoSeccion}>
+                  <div className={iconoSeccion}>
+                    <CalendarDays className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Fechas del equipo</h3>
+                </div>
+                <div className="grid gap-4 p-5 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Fecha de fabricación</label>
                     <input name="fechaFabricacion" type="date" value={datosGenerales.fechaFabricacion} onChange={manejarCambioCampo} aria-label="Seleccione una fecha de fabricación" className={claseCampoFecha} />
@@ -556,9 +575,14 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 </div>
               </section>
 
-              <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Características técnicas</h3>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <section className={`${tarjetaSeccion} mt-5`}>
+                <div className={encabezadoSeccion}>
+                  <div className={iconoSeccion}>
+                    <Settings className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Características técnicas</h3>
+                </div>
+                <div className="grid gap-4 p-5 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Periodicidad {marcaObligatorio}</label>
                     <select name="periodicidad" value={datosGenerales.periodicidad} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
@@ -582,9 +606,14 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 </div>
               </section>
 
-              <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Evidencia fotográfica</h3>
-                <div className="mt-4">
+              <section className={`${tarjetaSeccion} mt-5`}>
+                <div className={encabezadoSeccion}>
+                  <div className={iconoSeccion}>
+                    <ImageUp className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Evidencia fotográfica</h3>
+                </div>
+                <div className="p-5">
                   <label className="text-sm font-semibold text-slate-700">Adjuntar imagen del equipo</label>
                   <label className="mt-2 flex min-h-[170px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-600 bg-white px-4 py-6 text-center transition hover:bg-emerald-50">
                     <input type="file" accept="image/*" onChange={manejarCargaImagen} className="sr-only" />

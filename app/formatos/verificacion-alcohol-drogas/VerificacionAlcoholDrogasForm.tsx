@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
+import { ClipboardList, PenLine, ShieldCheck, Upload, UserCog, UsersRound } from "lucide-react";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F020",
@@ -75,10 +76,13 @@ const datosIniciales: DatosFormulario = {
 };
 
 const campoTexto =
-  "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-md outline-none placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const campoSeleccion =
-  "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-md outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const etiquetaCampo = "text-xs font-bold italic uppercase text-slate-950";
+  "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+const etiquetaCampo = "text-xs font-bold uppercase tracking-wide text-slate-600";
+const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
+const encabezadoSeccion = "flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const soloDecimal = (value: string) => value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
@@ -403,216 +407,280 @@ export default function VerificacionAlcoholDrogasForm() {
 
         <div className="border-t-2 border-blue-500 pt-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <section className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label className={etiquetaCampo}>Email {marcaObligatorio}</label>
-                <input name="email" type="email" value={datos.email} onChange={manejarCambio} placeholder="example1@domain.com,example2@domain.com..." className={campoTexto} />
+            <section className={tarjetaSeccion}>
+              <div className={encabezadoSeccion}>
+                <div className="flex items-center gap-4">
+                  <div className={iconoSeccion}>
+                    <UserCog className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Datos del evaluador</h3>
+                </div>
               </div>
+              <div className="grid gap-5 p-5 md:grid-cols-2">
+                <div>
+                  <label className={etiquetaCampo}>Email {marcaObligatorio}</label>
+                  <input name="email" type="email" value={datos.email} onChange={manejarCambio} placeholder="nombre@empresa.co" className={campoTexto} />
+                </div>
 
-              <div>
-                <label className={etiquetaCampo}>Centro de trabajo / sede {marcaObligatorio}</label>
-                <input name="centroTrabajoSede" value={datos.centroTrabajoSede} onChange={manejarCambio} className={campoTexto} />
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Tipo de prueba {marcaObligatorio}</label>
-                <input name="tipoPrueba" value={datos.tipoPrueba} onChange={manejarCambio} className={campoTexto} />
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Criterios de toma de muestra {marcaObligatorio}</label>
-                <input name="criteriosTomaMuestra" value={datos.criteriosTomaMuestra} onChange={manejarCambio} className={campoTexto} />
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Equipo que utiliza {marcaObligatorio}</label>
-                <input name="equipoUtiliza" value={datos.equipoUtiliza} onChange={manejarCambio} className={campoTexto} />
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Tipo de identificación de quien realiza la prueba {marcaObligatorio}</label>
-                <select name="tipoIdentificacionRealizaPrueba" value={datos.tipoIdentificacionRealizaPrueba} onChange={manejarCambio} className={campoSeleccion}>
-                  <option value="">Seleccione una opción</option>
-                  <option value="CC - Cédula de Ciudadanía">CC - Cédula de Ciudadanía</option>
-                  <option value="CE - Cédula de Extranjería">CE - Cédula de Extranjería</option>
-                  <option value="TI - Tarjeta de Identidad">TI - Tarjeta de Identidad</option>
-                  <option value="PAS - Pasaporte">PAS - Pasaporte</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Identificación de quien realiza la prueba {marcaObligatorio}</label>
-                <input name="identificacionRealizaPrueba" value={datos.identificacionRealizaPrueba} onChange={manejarCambio} inputMode="numeric" pattern="[0-9]*" className={campoTexto} />
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Nombre de quien realiza la prueba {marcaObligatorio}</label>
-                <input name="nombreRealizaPrueba" value={datos.nombreRealizaPrueba} onChange={manejarCambio} className={campoTexto} />
-              </div>
-
-              <div>
-                <label className={etiquetaCampo}>Cargo {marcaObligatorio}</label>
-                <input name="cargoRealizaPrueba" value={datos.cargoRealizaPrueba} onChange={manejarCambio} className={campoTexto} />
+                <div>
+                  <label className={etiquetaCampo}>Centro de trabajo / sede {marcaObligatorio}</label>
+                  <input name="centroTrabajoSede" value={datos.centroTrabajoSede} onChange={manejarCambio} className={campoTexto} />
+                </div>
               </div>
             </section>
 
-            <div className="mt-8 flex justify-center">
-              <h2 className="rounded-lg border border-emerald-700 bg-white px-4 py-2 text-sm font-bold uppercase text-emerald-950 shadow-md">
-                Información general del personal al que se le realiza la prueba
-              </h2>
-            </div>
-
-            <section className="mt-9 grid gap-5 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <p className={etiquetaCampo}>Seleccione una opción {marcaObligatorio}</p>
-                <div data-required-id="empresaPersonaEvaluada" className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900" tabIndex={-1}>
-                  {(["INCOMINERIA", "OTRO"] as EmpresaPersona[]).map((opcion) => (
-                    <label key={opcion} className="inline-flex items-center gap-2">
-                      <input
-                        type="radio"
-                        checked={datos.empresaPersonaEvaluada === opcion}
-                        onChange={() => manejarRadio("empresaPersonaEvaluada", opcion)}
-                        className="size-4 accent-emerald-700"
-                      />
-                      {opcion}
-                    </label>
-                  ))}
+            <section className={`${tarjetaSeccion} mt-7`}>
+              <div className={encabezadoSeccion}>
+                <div className="flex items-center gap-4">
+                  <div className={iconoSeccion}>
+                    <ClipboardList className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Detalles de la prueba</h3>
                 </div>
               </div>
-
-              {datos.empresaPersonaEvaluada ? (
-                <div className="grid gap-5 md:col-span-2 md:grid-cols-2">
-                  <div>
-                    <label className={etiquetaCampo}>Persona a la cual se le realiza la prueba {marcaObligatorio}</label>
-                    <input name="personaPrueba" value={datos.personaPrueba} onChange={manejarCambio} className={campoTexto} />
-                  </div>
-
-                  <div>
-                    <label className={etiquetaCampo}>Numero de identificacion {marcaObligatorio}</label>
-                    <input
-                      name="numeroIdentificacionPersona"
-                      value={datos.numeroIdentificacionPersona}
-                      onChange={manejarCambio}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      className={campoTexto}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={etiquetaCampo}>Empresa o contratista {marcaObligatorio}</label>
-                    <input
-                      name="empresaContratistaPersona"
-                      value={datos.empresaContratistaPersona}
-                      onChange={manejarCambio}
-                      readOnly={datos.empresaPersonaEvaluada === "INCOMINERIA"}
-                      className={`${campoTexto} ${datos.empresaPersonaEvaluada === "INCOMINERIA" ? "bg-slate-100" : ""}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={etiquetaCampo}>Cargo {marcaObligatorio}</label>
-                    <input name="cargoPersona" value={datos.cargoPersona} onChange={manejarCambio} className={campoTexto} />
-                  </div>
-
-                  <div>
-                    <label className={etiquetaCampo}>Resultado primera prueba inicial {marcaObligatorio}</label>
-                    <select name="resultadoPrimeraPruebaInicial" value={datos.resultadoPrimeraPruebaInicial} onChange={manejarCambio} className={campoSeleccion}>
-                      <option value="">Seleccione una opción</option>
-                      <option value="NEGATIVO">NEGATIVO</option>
-                      <option value="POSITIVO">POSITIVO</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className={etiquetaCampo}>Grado detectado en mg / 100ml {marcaObligatorio}</label>
-                    <input
-                      name="gradoDetectado"
-                      value={datos.gradoDetectado}
-                      onChange={manejarCambio}
-                      inputMode="decimal"
-                      placeholder="Solo numeros decimales"
-                      className={campoTexto}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={etiquetaCampo}>Imagen evidencia</label>
-                    <input
-                      key={imagenInputKey}
-                      type="file"
-                      accept="image/*"
-                      onChange={manejarCargaImagen}
-                      className="mt-3 block w-full text-sm text-slate-900 file:mr-4 file:rounded-none file:border file:border-slate-400 file:bg-white file:px-3 file:py-1 file:text-sm file:font-medium file:text-slate-950"
-                    />
-                    {datos.imagenEvidenciaNombre ? (
-                      <p className="mt-2 text-xs font-semibold text-slate-600">{datos.imagenEvidenciaNombre}</p>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between md:col-span-2">
+              <div className="grid gap-5 p-5 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
-                  <p className="mt-1 text-sm text-slate-600">{datos.firmaPersonaEvaluadaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
+                  <label className={etiquetaCampo}>Tipo de prueba {marcaObligatorio}</label>
+                  <input name="tipoPrueba" value={datos.tipoPrueba} onChange={manejarCambio} className={campoTexto} />
                 </div>
-                <button type="button" onClick={() => setModalFirmaAbierto(true)} data-required-id="firmaPersonaEvaluada" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
-                  Clic para firmar
-                </button>
+
+                <div>
+                  <label className={etiquetaCampo}>Criterios de toma de muestra {marcaObligatorio}</label>
+                  <select name="criteriosTomaMuestra" value={datos.criteriosTomaMuestra} onChange={manejarCambio} className={campoSeleccion}>
+                    <option value="">Seleccione una opcion</option>
+                    <option value="Todo el Personal">Todo el Personal</option>
+                    <option value="Duda Razonable">Duda Razonable</option>
+                    <option value="Aleatorio">Aleatorio</option>
+                    <option value="Caso Especial">Caso Especial</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={etiquetaCampo}>Equipo que utiliza {marcaObligatorio}</label>
+                  <input name="equipoUtiliza" value={datos.equipoUtiliza} onChange={manejarCambio} className={campoTexto} />
+                </div>
+
+                <div>
+                  <label className={etiquetaCampo}>Tipo de identificación de quien realiza la prueba {marcaObligatorio}</label>
+                  <select name="tipoIdentificacionRealizaPrueba" value={datos.tipoIdentificacionRealizaPrueba} onChange={manejarCambio} className={campoSeleccion}>
+                    <option value="">Seleccione una opción</option>
+                    <option value="CC - Cédula de Ciudadanía">CC - Cédula de Ciudadanía</option>
+                    <option value="CE - Cédula de Extranjería">CE - Cédula de Extranjería</option>
+                    <option value="TI - Tarjeta de Identidad">TI - Tarjeta de Identidad</option>
+                    <option value="PAS - Pasaporte">PAS - Pasaporte</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={etiquetaCampo}>Identificación de quien realiza la prueba {marcaObligatorio}</label>
+                  <input name="identificacionRealizaPrueba" value={datos.identificacionRealizaPrueba} onChange={manejarCambio} inputMode="numeric" pattern="[0-9]*" className={campoTexto} />
+                </div>
+
+                <div>
+                  <label className={etiquetaCampo}>Nombre de quien realiza la prueba {marcaObligatorio}</label>
+                  <input name="nombreRealizaPrueba" value={datos.nombreRealizaPrueba} onChange={manejarCambio} className={campoTexto} />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className={etiquetaCampo}>Cargo {marcaObligatorio}</label>
+                  <input name="cargoRealizaPrueba" value={datos.cargoRealizaPrueba} onChange={manejarCambio} className={campoTexto} />
+                </div>
               </div>
+            </section>
 
-              <p className="pt-4 text-base text-slate-950 md:col-span-2">
-                <span className="font-bold text-red-600">NOTA:</span> Será positivo cuando el resultado del{" "}
-                <span className="text-red-600">"Grado Detectado"</span> sea igual o mayor a{" "}
-                <span className="text-red-600">20mg / 100ml</span>
-              </p>
-
-              <div className="flex justify-center py-4 md:col-span-2">
-                <button
-                  type="button"
-                  onClick={agregarRegistro}
-                  data-required-id="agregarRegistroAlcoholDrogas"
-                  className="rounded-xl border border-slate-300 bg-slate-200 px-10 py-4 text-sm font-bold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-300"
-                >
-                  {indiceEdicion !== null ? "Actualizar datos" : "Agregar datos"}
-                </button>
+            <section className={`${tarjetaSeccion} mt-7`}>
+              <div className={encabezadoSeccion}>
+                <div className="flex items-center gap-4">
+                  <div className={iconoSeccion}>
+                    <UsersRound className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Información general del personal al que se le realiza la prueba</h3>
+                </div>
               </div>
+              <div className="grid gap-5 p-5 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <p className={etiquetaCampo}>Seleccione una opción {marcaObligatorio}</p>
+                  <div data-required-id="empresaPersonaEvaluada" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold uppercase text-slate-600" tabIndex={-1}>
+                    {(["INCOMINERIA", "OTRO"] as EmpresaPersona[]).map((opcion) => (
+                      <label
+                        key={opcion}
+                        className={`inline-flex min-w-36 items-center gap-3 rounded-2xl border px-5 py-3 transition ${
+                          datos.empresaPersonaEvaluada === opcion ? "border-emerald-800 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          checked={datos.empresaPersonaEvaluada === opcion}
+                          onChange={() => manejarRadio("empresaPersonaEvaluada", opcion)}
+                          className="size-5 accent-emerald-800"
+                        />
+                        {opcion}
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-              <div className="md:col-span-2">
-                <p className={etiquetaCampo}>¿ Hay testigo ?</p>
-                <div data-required-id="hayTestigo" className="mt-3 flex flex-wrap gap-8 pl-4 text-xs font-medium uppercase text-slate-900" tabIndex={-1}>
-                  {(["SI", "NO"] as RespuestaSiNo[]).map((opcion) => (
-                    <label key={opcion} className="inline-flex items-center gap-2">
+                {datos.empresaPersonaEvaluada ? (
+                  <>
+                    <div>
+                      <label className={etiquetaCampo}>Persona a la cual se le realiza la prueba {marcaObligatorio}</label>
+                      <input name="personaPrueba" value={datos.personaPrueba} onChange={manejarCambio} className={campoTexto} />
+                    </div>
+
+                    <div>
+                      <label className={etiquetaCampo}>Numero de identificacion {marcaObligatorio}</label>
                       <input
-                        type="radio"
-                        checked={datos.hayTestigo === opcion}
-                        onChange={() => manejarRadio("hayTestigo", opcion)}
-                        className="size-4 accent-emerald-700"
+                        name="numeroIdentificacionPersona"
+                        value={datos.numeroIdentificacionPersona}
+                        onChange={manejarCambio}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className={campoTexto}
                       />
-                      {opcion}
-                    </label>
-                  ))}
+                    </div>
+
+                    <div>
+                      <label className={etiquetaCampo}>Empresa o contratista {marcaObligatorio}</label>
+                      <input
+                        name="empresaContratistaPersona"
+                        value={datos.empresaContratistaPersona}
+                        onChange={manejarCambio}
+                        readOnly={datos.empresaPersonaEvaluada === "INCOMINERIA"}
+                        className={`${campoTexto} ${datos.empresaPersonaEvaluada === "INCOMINERIA" ? "bg-slate-100" : ""}`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={etiquetaCampo}>Cargo {marcaObligatorio}</label>
+                      <input name="cargoPersona" value={datos.cargoPersona} onChange={manejarCambio} className={campoTexto} />
+                    </div>
+
+                    <div>
+                      <label className={etiquetaCampo}>Resultado primera prueba inicial {marcaObligatorio}</label>
+                      <select name="resultadoPrimeraPruebaInicial" value={datos.resultadoPrimeraPruebaInicial} onChange={manejarCambio} className={campoSeleccion}>
+                        <option value="">Seleccione una opción</option>
+                        <option value="NEGATIVO">NEGATIVO</option>
+                        <option value="POSITIVO">POSITIVO</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={etiquetaCampo}>Grado detectado en mg / 100ml {marcaObligatorio}</label>
+                      <input
+                        name="gradoDetectado"
+                        value={datos.gradoDetectado}
+                        onChange={manejarCambio}
+                        inputMode="decimal"
+                        placeholder="Solo numeros decimales"
+                        className={campoTexto}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className={etiquetaCampo}>Imagen evidencia</label>
+                      <div className="mt-3 flex items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+                        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-900">
+                          <Upload className="size-5" aria-hidden="true" />
+                        </div>
+                        <input
+                          key={imagenInputKey}
+                          type="file"
+                          accept="image/*"
+                          onChange={manejarCargaImagen}
+                          className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-xl file:border file:border-slate-200 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                        />
+                      </div>
+                      {datos.imagenEvidenciaNombre ? (
+                        <p className="mt-2 text-xs font-semibold text-slate-600">{datos.imagenEvidenciaNombre}</p>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between md:col-span-2">
+                  <div className="flex items-center gap-4">
+                    <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white text-slate-700">
+                      <PenLine className="size-5" aria-hidden="true" />
+                    </div>
+                    <div>
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
+                    <p className="mt-1 text-sm text-slate-600">{datos.firmaPersonaEvaluadaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setModalFirmaAbierto(true)} data-required-id="firmaPersonaEvaluada" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                    Clic para firmar
+                  </button>
+                </div>
+
+                <p className="pt-4 text-base text-slate-950 md:col-span-2">
+                  <span className="font-bold text-red-600">NOTA:</span> Será positivo cuando el resultado del{" "}
+                  <span className="text-red-600">"Grado Detectado"</span> sea igual o mayor a{" "}
+                  <span className="text-red-600">20mg / 100ml</span>
+                </p>
+              </div>
+            </section>
+
+            <section className={`${tarjetaSeccion} mt-7`}>
+              <div className={encabezadoSeccion}>
+                <div className="flex items-center gap-4">
+                  <div className={iconoSeccion}>
+                    <ShieldCheck className="size-6" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Testigo y cierre</h3>
                 </div>
               </div>
-
-              {datos.hayTestigo === "SI" ? (
-                <>
-                  <div>
-                    <label className={etiquetaCampo}>Nombre de testigo</label>
-                    <input name="nombreTestigo" value={datos.nombreTestigo} onChange={manejarCambio} className={campoTexto} />
+              <div className="grid gap-5 p-5 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <p className={etiquetaCampo}>¿ Hay testigo ?</p>
+                  <div data-required-id="hayTestigo" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold uppercase text-slate-600" tabIndex={-1}>
+                    {(["SI", "NO"] as RespuestaSiNo[]).map((opcion) => (
+                      <label
+                        key={opcion}
+                        className={`inline-flex min-w-28 items-center gap-3 rounded-2xl border px-5 py-3 transition ${
+                          datos.hayTestigo === opcion ? "border-emerald-800 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          checked={datos.hayTestigo === opcion}
+                          onChange={() => manejarRadio("hayTestigo", opcion)}
+                          className="size-5 accent-emerald-800"
+                        />
+                        {opcion}
+                      </label>
+                    ))}
                   </div>
+                </div>
 
-                  <div>
-                    <label className={etiquetaCampo}>Cargo</label>
-                    <input name="cargoTestigo" value={datos.cargoTestigo} onChange={manejarCambio} className={campoTexto} />
-                  </div>
-                </>
-              ) : null}
+                {datos.hayTestigo === "SI" ? (
+                  <>
+                    <div>
+                      <label className={etiquetaCampo}>Nombre de testigo</label>
+                      <input name="nombreTestigo" value={datos.nombreTestigo} onChange={manejarCambio} className={campoTexto} />
+                    </div>
 
-              <div>
-                <label className={etiquetaCampo}>Confirmar</label>
-                <input name="confirmar" value={datos.confirmar} onChange={manejarCambio} className={campoTexto} />
+                    <div>
+                      <label className={etiquetaCampo}>Cargo</label>
+                      <input name="cargoTestigo" value={datos.cargoTestigo} onChange={manejarCambio} className={campoTexto} />
+                    </div>
+                  </>
+                ) : null}
+
+                <div className="md:col-span-2">
+                  <label className={etiquetaCampo}>Confirmar</label>
+                  <input name="confirmar" value={datos.confirmar} onChange={manejarCambio} className={campoTexto} />
+                </div>
+
+                <div className="flex justify-center py-4 md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={agregarRegistro}
+                    data-required-id="agregarRegistroAlcoholDrogas"
+                    className="rounded-xl border border-slate-300 bg-slate-200 px-10 py-4 text-sm font-bold uppercase tracking-wide text-slate-600 shadow-md transition hover:bg-slate-300"
+                  >
+                    {indiceEdicion !== null ? "Actualizar datos" : "Agregar datos"}
+                  </button>
+                </div>
               </div>
             </section>
           </div>

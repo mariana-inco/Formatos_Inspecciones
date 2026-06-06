@@ -59,16 +59,18 @@ export const camposEpp: CampoEpp[] = [
 ];
 
 export const gruposTablaEpp: { label: string; fields: CampoEpp[] }[] = [
-  { label: "CABEZA", fields: camposEpp.filter((campo) => campo.key === "casco") },
   {
-    label: "OJOS",
+    label: "CABEZA, ROSTRO Y OJOS",
     fields: camposEpp.filter((campo) =>
-      ["caretaEsmerilar", "caretaSoldadura", "monogafas"].includes(campo.key)
+      ["casco", "caretaEsmerilar", "caretaSoldadura", "monogafas"].includes(campo.key)
     ),
   },
-  { label: "OÍDOS", fields: camposEpp.filter((campo) => ["copa", "insercion"].includes(campo.key)) },
   {
-    label: "MANOS Y BRAZOS",
+    label: "OÍDOS",
+    fields: camposEpp.filter((campo) => ["copa", "insercion"].includes(campo.key)),
+  },
+  {
+    label: "MANOS Y EXTREMIDADES",
     fields: camposEpp.filter((campo) =>
       [
         "guantePoliuretano",
@@ -81,13 +83,15 @@ export const gruposTablaEpp: { label: string; fields: CampoEpp[] }[] = [
     ),
   },
   {
-    label: "SISTEMA RESPIRATORIO",
+    label: "SISTEMA RESPIRATORIO Y OTROS",
     fields: camposEpp.filter((campo) => ["mascarillaPolvoM10", "respiradorMediaCara"].includes(campo.key)),
   },
-  { label: "CUERPO", fields: camposEpp.filter((campo) => campo.key === "petoCarnaza") },
+  {
+    label: "CUERPO",
+    fields: camposEpp.filter((campo) => ["petoCarnaza"].includes(campo.key)),
+  },
   {
     label: "PIES",
     fields: camposEpp.filter((campo) => ["botaCaucho", "botasSeguridad", "botaSoldador"].includes(campo.key)),
   },
-  { label: "OTROS", fields: camposEpp.filter((campo) => campo.key === "otrosEpps") },
 ];

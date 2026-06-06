@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
+import { ClipboardList, FireExtinguisher, PenLine, UserCog } from "lucide-react";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F003",
@@ -84,12 +85,15 @@ const registroInicial: RegistroExtintor = {
 };
 
 const campoTexto =
-  "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-md outline-none placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const campoFecha =
-  "date-input mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-md outline-none [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+  "date-input mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const campoSeleccion =
-  "mt-2 block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-md outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const etiquetaCampo = "text-xs font-bold italic uppercase text-slate-950";
+  "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+const etiquetaCampo = "text-xs font-bold uppercase tracking-wide text-slate-600";
+const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
+const encabezadoSeccion = "flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
 
 const camposRevision: Array<{ key: keyof RegistroExtintor; label: string }> = [
@@ -106,6 +110,25 @@ const camposRevision: Array<{ key: keyof RegistroExtintor; label: string }> = [
   { key: "manija", label: "Manija" },
   { key: "corrosion", label: "Corrosión" },
 ];
+const gruposRevision = [
+  {
+    label: "Pintura / Señalización / Acceso / Visibilidad",
+    fields: camposRevision.filter((campo) => ["pintura", "senalizacion", "acceso", "visibilidad"].includes(String(campo.key))),
+  },
+  {
+    label: "Manometro / Presión / Pasador",
+    fields: camposRevision.filter((campo) => ["manometro", "presion", "pasador"].includes(String(campo.key))),
+  },
+  {
+    label: "Manguera / Boquilla / Envase",
+    fields: camposRevision.filter((campo) => ["manguera", "boquilla", "envase"].includes(String(campo.key))),
+  },
+  {
+    label: "Manija / Corrosión",
+    fields: camposRevision.filter((campo) => ["manija", "corrosion"].includes(String(campo.key))),
+  },
+];
+const opcionesRevision: EstadoRevision[] = ["BUENO", "REGULAR", "MALO", "NO APLICA"];
 
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
@@ -121,6 +144,14 @@ const claseEstadoComponente = (value: EstadoRevision) => {
   if (value === "REGULAR") return "bg-amber-500 text-white";
   if (value === "MALO") return "bg-red-500 text-white";
   return "bg-slate-200 text-slate-700";
+};
+const etiquetaEstadoRevision = (value: EstadoRevision) => (value === "NO APLICA" ? "N/A" : value);
+const claseBotonRevision = (value: EstadoRevision, seleccionado: boolean) => {
+  if (!seleccionado) return "border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50";
+  if (value === "BUENO") return "border border-emerald-300 bg-emerald-100 text-emerald-800 shadow-sm";
+  if (value === "REGULAR") return "border border-amber-300 bg-amber-100 text-amber-800 shadow-sm";
+  if (value === "MALO") return "border border-red-300 bg-red-100 text-red-800 shadow-sm";
+  return "border border-slate-300 bg-slate-100 text-slate-700 shadow-sm";
 };
 
 const serializarFirma = (svg: SVGSVGElement) => {
@@ -158,6 +189,10 @@ export default function InspeccionExtintoresForm() {
     const campo = name as keyof RegistroExtintor;
     const siguienteValor = campo === "numeroExtintor" ? soloNumeros(value) : value;
     setRegistro((prev) => ({ ...prev, [campo]: siguienteValor }));
+  };
+
+  const manejarEstadoRevision = (campo: keyof RegistroExtintor, estado: EstadoRevision) => {
+    setRegistro((prev) => ({ ...prev, [campo]: estado }));
   };
 
   const limpiarFirma = () => {
@@ -337,18 +372,19 @@ export default function InspeccionExtintoresForm() {
         </div>
 
         <div className="border-t-2 border-blue-500 pt-8">
-          <section className="space-y-7 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div>
-              <label className={etiquetaCampo}>Email {marcaObligatorio}</label>
-              <input name="email" type="email" value={datosInspeccion.email} onChange={manejarCambioDatosInspeccion} placeholder="example1@domain.com,example2@domain.com..." className={campoTexto} />
-            </div>
-
-            <div className="border-t-4 border-emerald-900 bg-slate-50 px-4 py-5 text-center shadow-sm">
-              <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-800">Datos de la inspección</h2>
-              <div className="mx-auto mt-3 h-2 w-11 rounded-full bg-emerald-900" />
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-7">
+            <section className={tarjetaSeccion}>
+              <div className={encabezadoSeccion}>
+                <div className={iconoSeccion}>
+                  <UserCog className="size-6" aria-hidden="true" />
+                </div>
+                <h2 className="text-base font-bold uppercase tracking-wide text-slate-950">Datos de la inspección</h2>
+              </div>
+              <div className="grid gap-5 p-5 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className={etiquetaCampo}>Email {marcaObligatorio}</label>
+                <input name="email" type="email" value={datosInspeccion.email} onChange={manejarCambioDatosInspeccion} placeholder="nombre@empresa.co" className={campoTexto} />
+              </div>
               <div>
                 <label className={etiquetaCampo}>Sede o centro de trabajo {marcaObligatorio}</label>
                 <input name="sedeCentroTrabajo" value={datosInspeccion.sedeCentroTrabajo} onChange={manejarCambioDatosInspeccion} className={campoTexto} />
@@ -369,78 +405,107 @@ export default function InspeccionExtintoresForm() {
                 <label className={etiquetaCampo}>Equipo externo</label>
                 <input name="equipoExterno" value={datosInspeccion.equipoExterno} onChange={manejarCambioDatosInspeccion} className={campoTexto} />
               </div>
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
-                <p className="mt-1 text-sm text-slate-600">{datosInspeccion.firmaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setFirmaTieneTrazo(false);
-                  setModalFirmaAbierto(true);
-                }}
-                data-required-id="firmaResponsable"
-                className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-              >
-                Clic para firmar
-              </button>
-            </div>
 
-            <div className="border-t-4 border-emerald-900 bg-slate-50 px-4 py-5 text-center shadow-sm">
-              <h2 className="text-2xl font-bold uppercase tracking-wide text-slate-800">Registro de inspección de extintores</h2>
-              <div className="mx-auto mt-3 h-2 w-11 rounded-full bg-emerald-900" />
-            </div>
+              <div className="mx-5 mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white text-slate-700">
+                    <PenLine className="size-5" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold italic uppercase text-slate-900">Firma {marcaObligatorio}</p>
+                    <p className="mt-1 text-sm text-slate-600">{datosInspeccion.firmaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFirmaTieneTrazo(false);
+                    setModalFirmaAbierto(true);
+                  }}
+                  data-required-id="firmaResponsable"
+                  className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+                >
+                  Clic para firmar
+                </button>
+              </div>
+            </section>
 
-            <div className="grid gap-5 md:grid-cols-2">
-              <div>
+            <section className={tarjetaSeccion}>
+              <div className={encabezadoSeccion}>
+                <div className={iconoSeccion}>
+                  <FireExtinguisher className="size-6" aria-hidden="true" />
+                </div>
+                <h2 className="text-base font-bold uppercase tracking-wide text-slate-950">Registro de inspección de extintores</h2>
+              </div>
+
+              <div className="grid grid-cols-12 gap-x-6 gap-y-5 p-5">
+              <div className="col-span-12 md:col-span-3">
                 <label className={etiquetaCampo}>N° del extintor {marcaObligatorio}</label>
                 <input name="numeroExtintor" value={registro.numeroExtintor} onChange={manejarCambioRegistro} inputMode="numeric" pattern="[0-9]*" className={campoTexto} />
               </div>
-              <div>
+              <div className="col-span-12 md:col-span-6">
                 <label className={etiquetaCampo}>Ubicación {marcaObligatorio}</label>
                 <input name="ubicacion" value={registro.ubicacion} onChange={manejarCambioRegistro} className={campoTexto} />
               </div>
-              <div>
+              <div className="col-span-12 md:col-span-3">
                 <label className={etiquetaCampo}>Capacidad {marcaObligatorio}</label>
                 <input name="capacidad" value={registro.capacidad} onChange={manejarCambioRegistro} className={campoTexto} />
               </div>
-              <div>
+              <div className="col-span-12 md:col-span-6">
                 <label className={etiquetaCampo}>Agente {marcaObligatorio}</label>
                 <input name="agente" value={registro.agente} onChange={manejarCambioRegistro} className={campoTexto} />
               </div>
-              <div>
+              <div className="col-span-12 md:col-span-6">
                 <label className={etiquetaCampo}>Clase {marcaObligatorio}</label>
                 <input name="clase" value={registro.clase} onChange={manejarCambioRegistro} className={campoTexto} />
               </div>
-              <div>
+              <div className="col-span-12 md:col-span-6">
                 <label className={etiquetaCampo}>Fecha última recarga {marcaObligatorio}</label>
                 <input name="fechaUltimaRecarga" type="date" value={registro.fechaUltimaRecarga} onChange={manejarCambioRegistro} className={campoFecha} />
               </div>
-              <div>
+              <div className="col-span-12 md:col-span-6">
                 <label className={etiquetaCampo}>Fecha próxima recarga {marcaObligatorio}</label>
                 <input name="fechaProximaRecarga" type="date" value={registro.fechaProximaRecarga} onChange={manejarCambioRegistro} className={campoFecha} />
               </div>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2">
-              {camposRevision.map((campo) => (
-                <div key={campo.key}>
-                  <label className={etiquetaCampo}>{campo.label} {marcaObligatorio}</label>
-                  <select name={campo.key} value={registro[campo.key] as EstadoRevision} onChange={manejarCambioRegistro} className={campoSeleccion}>
-                    <option value="">Seleccione una opcion</option>
-                    <option value="BUENO">BUENO</option>
-                    <option value="REGULAR">REGULAR</option>
-                    <option value="MALO">MALO</option>
-                    <option value="NO APLICA">NO APLICA</option>
-                  </select>
-                </div>
-              ))}
-            </div>
+              <div className="space-y-5 px-5">
+                {gruposRevision.map((grupo) => (
+                  <section key={grupo.label} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="bg-emerald-800 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white">
+                      {grupo.label}
+                    </div>
+                    <div className="grid gap-4 p-4 md:grid-cols-2">
+                      {grupo.fields.map((campo) => (
+                        <div key={campo.key} className="grid min-h-[72px] gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 lg:grid-cols-[minmax(130px,1fr)_auto] lg:items-center">
+                          <p className="text-xs font-bold uppercase text-slate-950">
+                            {campo.label} {marcaObligatorio}
+                          </p>
+                          <div data-required-id={String(campo.key)} className="inline-flex w-fit gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900" tabIndex={-1}>
+                            {opcionesRevision.map((opcion) => {
+                              const seleccionado = registro[campo.key] === opcion;
+                              return (
+                                <button
+                                  key={`${campo.key}-${opcion}`}
+                                  type="button"
+                                  onClick={() => manejarEstadoRevision(campo.key, opcion)}
+                                  aria-pressed={seleccionado}
+                                  className={`min-w-16 rounded-lg px-3 py-2 transition ${claseBotonRevision(opcion, seleccionado)}`}
+                                >
+                                  {etiquetaEstadoRevision(opcion)}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
 
-            <div>
+            <div className="p-5">
               <label className={etiquetaCampo}>Observaciones</label>
               <textarea name="observaciones" value={registro.observaciones} onChange={manejarCambioRegistro} rows={2} className={campoTexto} />
             </div>
@@ -450,7 +515,8 @@ export default function InspeccionExtintoresForm() {
                 {indiceEdicion !== null ? "Actualizar registro" : "Agregar registro"}
               </button>
             </div>
-          </section>
+            </section>
+          </div>
 
           {registros.length > 0 ? (
             <section className="mt-6">

@@ -4,8 +4,31 @@ import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
+import {
+  Check,
+  ClipboardList,
+  Ear,
+  EarOff,
+  Flame,
+  Footprints,
+  Glasses,
+  Hand,
+  HardHat,
+  Minus,
+  Pencil,
+  PlusCircle,
+  Shield,
+  Shirt,
+  Trash2,
+  TriangleAlert,
+  UserCog,
+  UsersRound,
+  Wind,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
-import type { CampoEppKey, CondicionEpp } from "./data";
+import type { CampoEpp, CampoEppKey, CondicionEpp } from "./data";
 
 type OtroEpp = {
   cual: string;
@@ -66,6 +89,9 @@ const fieldClassName =
   "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const selectClassName =
   "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
+const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
+const encabezadoSeccion = "flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const requiredMark = <span className="text-red-600">*</span>;
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const camposSinNumeros = new Set<keyof DatosFormulario>(["nombreColaborador", "cargoTrabajador"]);
@@ -77,6 +103,77 @@ const enfocarCampoFaltante = (id: string) => {
 };
 const crearDetalleOtrosEpps = (cantidad: number, detalleActual: OtroEpp[] = []) =>
   Array.from({ length: cantidad }, (_, index) => detalleActual[index] ?? { cual: "", condicion: "" });
+const etiquetaCondicion = (condicion: CondicionEpp) => {
+  if (condicion === "BUENO") return "Bueno";
+  if (condicion === "REGULAR") return "Regular";
+  if (condicion === "MALO") return "Malo";
+  return "N/A";
+};
+const estiloBotonCondicion = (condicion: CondicionEpp, seleccionado: boolean) => {
+  if (!seleccionado) {
+    return "border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-slate-300 hover:bg-slate-50";
+  }
+
+  if (condicion === "BUENO") return "border border-emerald-300 bg-emerald-100 text-emerald-800 shadow-sm";
+  if (condicion === "REGULAR") return "border border-amber-300 bg-amber-100 text-amber-800 shadow-sm";
+  if (condicion === "MALO") return "border border-red-300 bg-red-100 text-red-800 shadow-sm";
+  return "border border-slate-300 bg-slate-100 text-slate-700 shadow-sm";
+};
+const iconosEpp: Partial<Record<CampoEppKey, LucideIcon>> = {
+  casco: HardHat,
+  caretaEsmerilar: Shield,
+  caretaSoldadura: Flame,
+  monogafas: Glasses,
+  copa: Ear,
+  insercion: EarOff,
+  guantePoliuretano: Hand,
+  guanteCaucho: Hand,
+  guanteNitrilo: Hand,
+  guanteVaqueta: Hand,
+  mangaCarnaza: Shirt,
+  guantesSoldador: Hand,
+  mascarillaPolvoM10: Wind,
+  respiradorMediaCara: Wind,
+  petoCarnaza: Shield,
+  botaCaucho: Footprints,
+  botasSeguridad: Footprints,
+  botaSoldador: Footprints,
+};
+const estilosGrupoTabla = [
+  { line: "bg-emerald-300", border: "border-l-emerald-300" },
+  { line: "bg-cyan-300", border: "border-l-cyan-300" },
+  { line: "bg-lime-300", border: "border-l-lime-300" },
+  { line: "bg-sky-300", border: "border-l-sky-300" },
+  { line: "bg-amber-300", border: "border-l-amber-300" },
+  { line: "bg-teal-300", border: "border-l-teal-300" },
+];
+const obtenerIconoEpp = (campo: CampoEpp) => iconosEpp[campo.key] ?? Shield;
+const obtenerEstiloGrupo = (index: number) => estilosGrupoTabla[index % estilosGrupoTabla.length];
+const obtenerCondicionRegistro = (registro: RegistroEpp, campo: CampoEpp) => registro[campo.key] as CondicionEpp;
+const EstadoBadge = ({ condicion, compacto = false }: { condicion: CondicionEpp; compacto?: boolean }) => {
+  const estado =
+    condicion === "BUENO"
+      ? { label: "Bueno", icon: Check, className: "bg-emerald-100 text-emerald-800 ring-emerald-200" }
+      : condicion === "REGULAR"
+        ? { label: "Regular", icon: TriangleAlert, className: "bg-amber-100 text-amber-800 ring-amber-200" }
+        : condicion === "MALO"
+          ? { label: "Malo", icon: X, className: "bg-red-100 text-red-800 ring-red-200" }
+          : { label: "N/A", icon: Minus, className: "bg-slate-100 text-slate-600 ring-slate-200" };
+  const Icono = estado.icon;
+
+  return (
+    <span
+      title={estado.label}
+      aria-label={estado.label}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full font-bold ring-1 ${estado.className} ${
+        compacto ? "size-9 p-0" : "px-3 py-1.5 text-xs"
+      }`}
+    >
+      <Icono className="size-4" aria-hidden="true" />
+      {compacto ? <span className="sr-only">{estado.label}</span> : estado.label}
+    </span>
+  );
+};
 const serializarFirma = (svg: SVGSVGElement) => {
   const firmaClonada = svg.cloneNode(true) as SVGSVGElement;
   const rect = svg.getBoundingClientRect();
@@ -97,6 +194,7 @@ export default function InspeccionEppForm() {
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
+  const [cantidadOtrosAbierta, setCantidadOtrosAbierta] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -124,6 +222,20 @@ export default function InspeccionEppForm() {
         itemIndex === index ? { ...item, [field]: value } : item
       ),
     }));
+  };
+
+  const handleCantidadOtrosEpps = (nextValue: string) => {
+    const cantidad = Number(nextValue || 0);
+    setDatos((prev) => ({
+      ...prev,
+      otrosEpps: nextValue,
+      otrosEppsDetalle: crearDetalleOtrosEpps(cantidad, prev.otrosEppsDetalle),
+    }));
+    setCantidadOtrosAbierta(false);
+  };
+
+  const handleCondicionEpp = (campo: CampoEppKey, condicion: CondicionEpp) => {
+    setDatos((prev) => ({ ...prev, [campo]: condicion }));
   };
 
   const limpiarCalificacion = () => {
@@ -318,20 +430,25 @@ export default function InspeccionEppForm() {
               <p className="mt-1 text-sm text-slate-600">Complete los datos generales y califique la condición de los elementos de protección personal.</p>
             </div>
 
-            <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Datos generales</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <section className={tarjetaSeccion}>
+              <div className={encabezadoSeccion}>
+                <div className={iconoSeccion}>
+                  <UserCog className="size-6" aria-hidden="true" />
+                </div>
+                <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Datos generales</h3>
+              </div>
+              <div className="grid gap-4 p-5 md:grid-cols-2">
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Correo electrónico {requiredMark}</label>
                   <input name="email" type="email" value={datos.email} onChange={handleChange} placeholder="usuario@empresa.com" className={fieldClassName} />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-slate-700">Fecha de inspección {requiredMark}</label>
-                  <input name="fechaInspeccion" type="date" value={datos.fechaInspeccion} onChange={handleChange} aria-label="Seleccione una fecha de inspección" className={dateInputClassName} />
-                </div>
-                <div>
                   <label className="text-sm font-semibold text-slate-700">Lugar {requiredMark}</label>
                   <input name="lugar" value={datos.lugar} onChange={handleChange} placeholder="Ej: Mina principal" className={fieldClassName} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700">Fecha de inspección {requiredMark}</label>
+                  <input name="fechaInspeccion" type="date" value={datos.fechaInspeccion} onChange={handleChange} aria-label="Seleccione una fecha de inspección" className={dateInputClassName} />
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Área de trabajo {requiredMark}</label>
@@ -347,9 +464,14 @@ export default function InspeccionEppForm() {
               </div>
             </section>
 
-            <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <h3 className="border-l-4 border-emerald-700 pl-3 text-sm font-bold uppercase text-slate-900">Califique la condición del EPP</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <section className={`${tarjetaSeccion} mt-5`}>
+              <div className={encabezadoSeccion}>
+                <div className={iconoSeccion}>
+                  <UsersRound className="size-6" aria-hidden="true" />
+                </div>
+                <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Datos del colaborador</h3>
+              </div>
+              <div className="grid gap-4 p-5 md:grid-cols-2">
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Nombre del colaborador {requiredMark}</label>
                   <input name="nombreColaborador" value={datos.nombreColaborador} onChange={handleChange} placeholder="Nombre completo" className={fieldClassName} />
@@ -358,69 +480,189 @@ export default function InspeccionEppForm() {
                   <label className="text-sm font-semibold text-slate-700">Cargo del trabajador {requiredMark}</label>
                   <input name="cargoTrabajador" value={datos.cargoTrabajador} onChange={handleChange} placeholder="Ej: Operador" className={fieldClassName} />
                 </div>
+              </div>
+            </section>
 
-                {camposEpp.map((campo) =>
-                  campo.key === "otrosEpps" ? (
-                    <div key={campo.key} className="md:col-span-2">
-                      <label className="text-sm font-semibold text-slate-700">{campo.label}</label>
-                      <select name={campo.key} value={datos.otrosEpps} onChange={handleChange} className={selectClassName}>
-                        <option value="">Seleccione una opción</option>
-                        {opcionesCantidadOtrosEpps.map((opcion) => (
-                          <option key={opcion} value={opcion}>
-                            {opcion}
-                          </option>
-                        ))}
-                      </select>
+            <section className={`${tarjetaSeccion} mt-5`}>
+              <div className={encabezadoSeccion}>
+                <div className={iconoSeccion}>
+                  <Shield className="size-6" aria-hidden="true" />
+                </div>
+                <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Califique la condición del EPP</h3>
+              </div>
+              <div className="grid gap-4 p-5">
+                <div className="space-y-5">
+                  {gruposTablaEpp.map((grupo) => (
+                    <section key={grupo.label} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                      <div className="bg-emerald-800 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white">
+                        {grupo.label}
+                      </div>
+                      <div className="grid gap-4 p-4 md:grid-cols-2">
+                        {grupo.fields.map((campo) =>
+                          campo.key === "otrosEpps" ? (
+                            <div key={campo.key} className="rounded-md border border-slate-300 bg-slate-50 px-4 py-3 md:col-span-2">
+                              <label className="text-xs font-bold uppercase text-slate-950">{campo.label}</label>
+                              <select name={campo.key} value={datos.otrosEpps} onChange={handleChange} className={selectClassName}>
+                                <option value="">Seleccione una opción</option>
+                                {opcionesCantidadOtrosEpps.map((opcion) => (
+                                  <option key={opcion} value={opcion}>
+                                    {opcion}
+                                  </option>
+                                ))}
+                              </select>
 
-                      {datos.otrosEppsDetalle.length > 0 ? (
-                        <div className="mt-5 grid gap-4">
-                          {datos.otrosEppsDetalle.map((otroEpp, index) => (
-                            <div key={`otro-epp-${index}`} className="grid gap-4 md:grid-cols-2">
-                              <div>
-                                <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
-                                <input
-                                  data-required-id={`otroEppCual-${index}`}
-                                  value={otroEpp.cual}
-                                  onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
-                                  placeholder={`Otro EPP ${index + 1}`}
-                                  className={fieldClassName}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-sm font-semibold text-slate-700">Condición</label>
-                                <select
-                                  data-required-id={`otroEppCondicion-${index}`}
-                                  value={otroEpp.condicion}
-                                  onChange={(event) => handleOtroEppChange(index, "condicion", event.target.value)}
-                                  className={selectClassName}
-                                >
-                                  <option value="">Seleccione una opción</option>
-                                  {opcionesCondicion.map((opcion) => (
-                                    <option key={opcion} value={opcion}>
-                                      {opcion}
-                                    </option>
+                              {datos.otrosEppsDetalle.length > 0 ? (
+                                <div className="mt-5 grid gap-4">
+                                  {datos.otrosEppsDetalle.map((otroEpp, index) => (
+                                    <div key={`otro-epp-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                                      <div>
+                                        <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
+                                        <input
+                                          data-required-id={`otroEppCual-${index}`}
+                                          value={otroEpp.cual}
+                                          onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
+                                          placeholder={`Otro EPP ${index + 1}`}
+                                          className={fieldClassName}
+                                        />
+                                      </div>
+                                      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center">
+                                        <label className="text-sm font-semibold text-slate-700">Condición</label>
+                                        <div data-required-id={`otroEppCondicion-${index}`} className="inline-flex gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900">
+                                          {opcionesCondicion.map((opcion) => {
+                                            const seleccionado = otroEpp.condicion === opcion;
+                                            return (
+                                              <button
+                                                key={`otro-epp-${index}-${opcion}`}
+                                                type="button"
+                                                onClick={() => handleOtroEppChange(index, "condicion", opcion)}
+                                                aria-pressed={seleccionado}
+                                                className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
+                                              >
+                                                {etiquetaCondicion(opcion)}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
                                   ))}
-                                </select>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div key={campo.key} className="grid min-h-[50px] grid-cols-[minmax(120px,1fr)_auto] items-center gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3">
+                              <p className="text-xs font-bold uppercase text-slate-950">{campo.label}</p>
+                              <div className="inline-flex gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900">
+                                {opcionesCondicion.map((opcion) => {
+                                  const seleccionado = datos[campo.key] === opcion;
+                                  return (
+                                    <button
+                                      key={`${campo.key}-${opcion}`}
+                                      type="button"
+                                      onClick={() => handleCondicionEpp(campo.key, opcion)}
+                                      aria-pressed={seleccionado}
+                                      className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
+                                    >
+                                      {etiquetaCondicion(opcion)}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
+                          )
+                        )}
+                      </div>
+                    </section>
+                  ))}
+
+                  <div>
+                    <label className="text-xs font-bold uppercase text-slate-950">OTROS EPPS</label>
+                    <div className="relative mt-2">
+                      <button
+                        type="button"
+                        name="otrosEpps"
+                        onClick={() => setCantidadOtrosAbierta((prev) => !prev)}
+                        onBlur={() => window.setTimeout(() => setCantidadOtrosAbierta(false), 150)}
+                        aria-haspopup="listbox"
+                        aria-expanded={cantidadOtrosAbierta}
+                        className="flex w-full items-center rounded-3xl border border-slate-300 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-950 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      >
+                        <span>{datos.otrosEpps || "Seleccione una opción"}</span>
+                      </button>
+
+                      {cantidadOtrosAbierta ? (
+                        <div
+                          role="listbox"
+                          className="absolute left-0 top-full z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-2xl border border-slate-300 bg-white py-1 text-sm font-semibold text-slate-950 shadow-lg"
+                        >
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={!datos.otrosEpps}
+                            onMouseDown={() => handleCantidadOtrosEpps("")}
+                            className={`block w-full px-4 py-2 text-left transition hover:bg-slate-100 ${
+                              !datos.otrosEpps ? "bg-slate-700 text-white hover:bg-slate-700" : "text-slate-950"
+                            }`}
+                          >
+                            Seleccione una opción
+                          </button>
+                          {opcionesCantidadOtrosEpps.map((opcion) => (
+                            <button
+                              key={opcion}
+                              type="button"
+                              role="option"
+                              aria-selected={datos.otrosEpps === opcion}
+                              onMouseDown={() => handleCantidadOtrosEpps(opcion)}
+                              className={`block w-full px-4 py-2 text-left transition hover:bg-slate-100 ${
+                                datos.otrosEpps === opcion ? "bg-slate-700 text-white hover:bg-slate-700" : "text-slate-950"
+                              }`}
+                            >
+                              {opcion}
+                            </button>
                           ))}
                         </div>
                       ) : null}
                     </div>
-                  ) : (
-                    <div key={campo.key}>
-                      <label className="text-sm font-semibold text-slate-700">{campo.label}</label>
-                      <select name={campo.key} value={datos[campo.key]} onChange={handleChange} className={selectClassName}>
-                        <option value="">Seleccione una opción</option>
-                        {opcionesCondicion.map((opcion) => (
-                          <option key={opcion} value={opcion}>
-                            {opcion}
-                          </option>
-                        ))}
-                      </select>
+                  </div>
+
+                  {datos.otrosEppsDetalle.length > 0 ? (
+                    <div className="mt-5 grid gap-4">
+                      {datos.otrosEppsDetalle.map((otroEpp, index) => (
+                        <div key={`otro-epp-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                          <div>
+                            <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
+                            <input
+                              data-required-id={`otroEppCual-${index}`}
+                              value={otroEpp.cual}
+                              onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
+                              placeholder={`Otro EPP ${index + 1}`}
+                              className={fieldClassName}
+                            />
+                          </div>
+                          <div className="mt-4 grid gap-3">
+                            <label className="text-sm font-semibold text-slate-700">Condición</label>
+                            <div data-required-id={`otroEppCondicion-${index}`} className="inline-flex w-fit gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900">
+                              {opcionesCondicion.map((opcion) => {
+                                const seleccionado = otroEpp.condicion === opcion;
+                                return (
+                                  <button
+                                    key={`otro-epp-${index}-${opcion}`}
+                                    type="button"
+                                    onClick={() => handleOtroEppChange(index, "condicion", opcion)}
+                                    aria-pressed={seleccionado}
+                                    className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
+                                  >
+                                    {etiquetaCondicion(opcion)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )
-                )}
+                  ) : null}
+                </div>
 
                 <div className="md:col-span-2">
                   <label className="text-sm font-semibold text-slate-700">Observaciones</label>
@@ -461,103 +703,206 @@ export default function InspeccionEppForm() {
         </div>
 
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Resumen de EPPs calificados</h2>
               <p className="mt-1 text-sm text-slate-600">Revise los registros agregados antes de enviar el formulario.</p>
             </div>
-            <span className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold uppercase text-emerald-800">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold uppercase text-emerald-800">
+              <ClipboardList className="size-4" aria-hidden="true" />
               {registros.length} registro{registros.length === 1 ? "" : "s"}
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="min-w-[1800px] w-full border-collapse text-xs">
-              <thead className="bg-emerald-900 text-white">
-                <tr>
-                  <th rowSpan={2} className="w-[260px] border border-white/40 px-3 py-4 text-center uppercase">
-                    Nombre y cargo del trabajador
-                  </th>
-                  {gruposTablaEpp.map((grupo) => (
-                    <th key={grupo.label} colSpan={grupo.fields.length} className="border border-white/40 px-3 py-3 text-center uppercase">
-                      {grupo.label}
-                    </th>
-                  ))}
-                  <th rowSpan={2} className="w-[220px] border border-white/40 px-3 py-4 text-center uppercase">
-                    Observaciones
-                  </th>
-                  <th rowSpan={2} className="w-[180px] border border-white/40 px-3 py-4 text-center uppercase">
-                    Firma
-                  </th>
-                  <th rowSpan={2} className="w-[110px] border border-white/40 px-3 py-4 text-center uppercase">
-                    Acción
-                  </th>
-                </tr>
-                <tr>
-                  {gruposTablaEpp.flatMap((grupo) =>
-                    grupo.fields.map((campo) => (
-                      <th key={campo.key} className="h-32 border border-white/40 px-2 py-3 text-center align-bottom uppercase">
-                        <span className="inline-block max-h-28 [writing-mode:vertical-rl] rotate-180 leading-tight">{campo.label}</span>
-                      </th>
-                    ))
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white text-slate-800">
-                {registros.length === 0 ? (
-                  <tr>
-                    <td colSpan={camposEpp.length + 4} className="px-4 py-8 text-center text-sm text-slate-500">
-                      Aún no hay registros agregados.
-                    </td>
-                  </tr>
-                ) : (
-                  registros.map((registro, index) => (
-                    <tr key={`${registro.nombreColaborador}-${index}`} className="hover:bg-slate-50">
-                      <td className="border border-slate-200 px-3 py-3 align-top">
-                        <div className="font-bold uppercase text-slate-900">{registro.nombreColaborador}</div>
-                        <div className="mt-1 text-slate-600">{registro.cargoTrabajador}</div>
-                      </td>
-                      {gruposTablaEpp.flatMap((grupo) =>
-                        grupo.fields.map((campo) => {
-                          const valorOtrosEpps =
-                            registro.otrosEppsDetalle.length > 0
-                              ? registro.otrosEppsDetalle
-                                  .map((item, itemIndex) => `${itemIndex + 1}. ${item.cual || "Sin nombre"} (${item.condicion || "Sin calificar"})`)
-                                  .join(" | ")
-                              : registro.otrosEpps || "-";
+          <div className="mb-5 flex flex-wrap gap-3" aria-label="Leyenda de calificaciones">
+            <EstadoBadge condicion="BUENO" />
+            <EstadoBadge condicion="REGULAR" />
+            <EstadoBadge condicion="MALO" />
+            <EstadoBadge condicion="N/A" />
+          </div>
 
-                          return (
-                            <td key={`${index}-${campo.key}`} className="border border-slate-200 px-2 py-3 text-center font-semibold">
-                              {campo.key === "otrosEpps" ? valorOtrosEpps : registro[campo.key] || "-"}
-                            </td>
-                          );
-                        })
-                      )}
-                      <td className="border border-slate-200 px-3 py-3 align-top">{registro.observaciones || "-"}</td>
-                      <td className="border border-slate-200 p-0">
-                        {registro.firmaColaborador ? (
-                          <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
-                            <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
-                          </div>
-                        ) : (
-                          <div className="px-3 py-3 text-center text-slate-500">Pendiente</div>
-                        )}
-                      </td>
-                      <td className="border border-slate-200 px-3 py-3 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button type="button" onClick={() => handleEditarRegistro(index)} className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
-                            Editar
-                          </button>
-                          <button type="button" onClick={() => handleEliminarRegistro(index)} className="rounded-full bg-red-600 px-3 py-2 text-xs font-bold text-white">
-                            Borrar
+          <div className="hidden md:block">
+            <div className="relative overflow-x-auto rounded-lg border border-slate-200 shadow-inner" role="region" aria-label="Tabla de resumen de EPPs calificados" tabIndex={0}>
+              <div className="pointer-events-none absolute right-[108px] top-0 z-20 h-full w-10 bg-gradient-to-l from-white to-transparent" aria-hidden="true" />
+              <table className="w-full min-w-[1900px] border-separate border-spacing-0 text-xs">
+                <thead className="sticky top-0 z-30 bg-emerald-900 text-white">
+                  <tr>
+                    <th rowSpan={2} scope="col" className="sticky left-0 z-40 w-[280px] min-w-[280px] border-r border-emerald-700 bg-emerald-900 px-4 py-4 text-left uppercase shadow-[8px_0_16px_-12px_rgba(15,23,42,0.7)]">
+                      Nombre y cargo del trabajador
+                    </th>
+                    {gruposTablaEpp.map((grupo, grupoIndex) => {
+                      const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
+                      return (
+                        <th key={grupo.label} colSpan={grupo.fields.length} scope="colgroup" className="border-l-2 border-l-emerald-700 border-r border-r-emerald-800 px-3 py-4 text-center uppercase">
+                          <span>{grupo.label}</span>
+                          <span className={`mx-auto mt-3 block h-1.5 w-14 rounded-full ${estiloGrupo.line}`} aria-hidden="true" />
+                        </th>
+                      );
+                    })}
+                    <th rowSpan={2} scope="col" className="w-[230px] min-w-[230px] border-l-2 border-l-emerald-700 px-3 py-4 text-center uppercase">
+                      Observaciones
+                    </th>
+                    <th rowSpan={2} scope="col" className="w-[180px] min-w-[180px] border-l border-emerald-800 px-3 py-4 text-center uppercase">
+                      Firma
+                    </th>
+                    <th rowSpan={2} scope="col" className="sticky right-0 z-40 w-[110px] min-w-[110px] border-l border-emerald-700 bg-emerald-900 px-3 py-4 text-center uppercase shadow-[-8px_0_16px_-12px_rgba(15,23,42,0.7)]">
+                      Acción
+                    </th>
+                  </tr>
+                  <tr>
+                    {gruposTablaEpp.flatMap((grupo, grupoIndex) =>
+                      grupo.fields.map((campo, campoIndex) => {
+                        const IconoCampo = obtenerIconoEpp(campo);
+                        const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
+                        const separadorGrupo = campoIndex === 0 ? `border-l-2 ${estiloGrupo.border}` : "border-l border-white/15";
+                        return (
+                          <th key={campo.key} scope="col" title={campo.label} className={`w-[95px] min-w-[95px] border-r border-white/15 px-2 py-3 text-center align-top ${separadorGrupo}`}>
+                            <span className="mx-auto flex max-w-[88px] flex-col items-center gap-2">
+                              <IconoCampo className="size-5 text-emerald-100" aria-hidden="true" />
+                              <span className="[text-wrap:balance] leading-tight normal-case">{campo.label}</span>
+                            </span>
+                          </th>
+                        );
+                      })
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="text-slate-800">
+                  {registros.length === 0 ? (
+                    <tr>
+                      <td colSpan={gruposTablaEpp.reduce((total, grupo) => total + grupo.fields.length, 0) + 4} className="px-4 py-10 text-center">
+                        <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-slate-600">
+                          <PlusCircle className="size-10 text-emerald-700" aria-hidden="true" />
+                          <p className="text-sm font-semibold">Aún no hay registros agregados.</p>
+                          <button type="button" onClick={() => enfocarCampoFaltante("nombreColaborador")} className="rounded-full bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800">
+                            Agregar el primer registro
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    registros.map((registro, index) => (
+                      <tr key={`${registro.nombreColaborador}-${index}`} className={`group transition hover:bg-emerald-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/80"}`}>
+                        <th scope="row" className={`sticky left-0 z-10 border-b border-slate-200 border-r border-slate-200 px-4 py-4 text-left align-top shadow-[8px_0_16px_-14px_rgba(15,23,42,0.7)] group-hover:bg-emerald-50 ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                          <div className="font-bold uppercase text-slate-950">{registro.nombreColaborador}</div>
+                          <div className="mt-1 text-sm font-semibold text-slate-600">{registro.cargoTrabajador}</div>
+                        </th>
+                        {gruposTablaEpp.flatMap((grupo, grupoIndex) =>
+                          grupo.fields.map((campo, campoIndex) => {
+                            const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
+                            const separadorGrupo = campoIndex === 0 ? `border-l-2 ${estiloGrupo.border}` : "border-l border-slate-100";
+                            return (
+                              <td key={`${index}-${campo.key}`} className={`border-b border-slate-200 border-r border-slate-100 px-2 py-4 text-center ${separadorGrupo}`}>
+                                <EstadoBadge condicion={obtenerCondicionRegistro(registro, campo)} compacto />
+                              </td>
+                            );
+                          })
+                        )}
+                        <td className="border-b border-l-2 border-l-slate-200 border-r border-slate-100 px-3 py-4 align-top text-sm">{registro.observaciones || "-"}</td>
+                        <td className="border-b border-r border-slate-100 p-0">
+                          {registro.firmaColaborador ? (
+                            <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
+                              <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
+                            </div>
+                          ) : (
+                            <div className="px-3 py-4 text-center text-sm text-slate-500">Pendiente</div>
+                          )}
+                        </td>
+                        <td className={`sticky right-0 z-10 border-b border-l border-slate-200 px-3 py-4 text-center shadow-[-8px_0_16px_-14px_rgba(15,23,42,0.7)] group-hover:bg-emerald-50 ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                          <div className="flex justify-center gap-2">
+                            <button type="button" onClick={() => handleEditarRegistro(index)} aria-label={`Editar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-emerald-100 hover:text-emerald-800">
+                              <Pencil className="size-4" aria-hidden="true" />
+                            </button>
+                            <button type="button" onClick={() => handleEliminarRegistro(index)} aria-label={`Borrar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-red-100 hover:text-red-700">
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
+              <span aria-hidden="true">{"<->"}</span>
+              Desplácese horizontalmente para ver todas las columnas
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:hidden">
+            {registros.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                <PlusCircle className="mx-auto size-10 text-emerald-700" aria-hidden="true" />
+                <p className="mt-3 text-sm font-semibold text-slate-600">Aún no hay registros agregados.</p>
+                <button type="button" onClick={() => enfocarCampoFaltante("nombreColaborador")} className="mt-4 rounded-full bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800">
+                  Agregar el primer registro
+                </button>
+              </div>
+            ) : (
+              registros.map((registro, index) => (
+                <article key={`card-${registro.nombreColaborador}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+                    <div>
+                      <h3 className="text-base font-bold uppercase text-slate-950">{registro.nombreColaborador}</h3>
+                      <p className="mt-1 text-sm font-semibold text-slate-600">{registro.cargoTrabajador}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => handleEditarRegistro(index)} aria-label={`Editar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-emerald-100 hover:text-emerald-800">
+                        <Pencil className="size-4" aria-hidden="true" />
+                      </button>
+                      <button type="button" onClick={() => handleEliminarRegistro(index)} aria-label={`Borrar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-red-100 hover:text-red-700">
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-4">
+                    {gruposTablaEpp.map((grupo, grupoIndex) => {
+                      const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
+                      return (
+                        <section key={`${registro.nombreColaborador}-${grupo.label}`} className={`rounded-lg border border-slate-200 border-l-4 ${estiloGrupo.border} bg-slate-50 p-3`}>
+                          <h4 className="text-xs font-bold uppercase text-emerald-900">{grupo.label}</h4>
+                          <div className="mt-3 grid gap-2">
+                            {grupo.fields.map((campo) => {
+                              const IconoCampo = obtenerIconoEpp(campo);
+                              return (
+                                <div key={`${registro.nombreColaborador}-${campo.key}`} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <IconoCampo className="size-4 shrink-0 text-emerald-800" aria-hidden="true" />
+                                    <span title={campo.label} className="text-xs font-bold uppercase text-slate-800 [text-wrap:balance]">
+                                      {campo.label}
+                                    </span>
+                                  </div>
+                                  <EstadoBadge condicion={obtenerCondicionRegistro(registro, campo)} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-700">Observaciones</p>
+                      <p className="mt-1 text-sm text-slate-700">{registro.observaciones || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-700">Firma</p>
+                      {registro.firmaColaborador ? (
+                        <div className="mt-2 flex h-20 items-center justify-center overflow-hidden rounded-md bg-white px-2 py-1">
+                          <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-sm text-slate-500">Pendiente</p>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </div>
 
