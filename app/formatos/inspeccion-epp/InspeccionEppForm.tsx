@@ -90,7 +90,7 @@ const fieldClassName =
 const selectClassName =
   "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
-const encabezadoSeccion = "flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const encabezadoSeccion = "flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
 const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const requiredMark = <span className="text-red-600">*</span>;
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
@@ -396,7 +396,7 @@ export default function InspeccionEppForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-8 sm:px-12">
+    <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
@@ -527,7 +527,7 @@ export default function InspeccionEppForm() {
                                       </div>
                                       <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center">
                                         <label className="text-sm font-semibold text-slate-700">Condición</label>
-                                        <div data-required-id={`otroEppCondicion-${index}`} className="inline-flex gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900">
+                                        <div data-required-id={`otroEppCondicion-${index}`} className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit">
                                           {opcionesCondicion.map((opcion) => {
                                             const seleccionado = otroEpp.condicion === opcion;
                                             return (
@@ -550,9 +550,9 @@ export default function InspeccionEppForm() {
                               ) : null}
                             </div>
                           ) : (
-                            <div key={campo.key} className="grid min-h-[50px] grid-cols-[minmax(120px,1fr)_auto] items-center gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3">
+                            <div key={campo.key} className="grid min-h-[50px] gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center">
                               <p className="text-xs font-bold uppercase text-slate-950">{campo.label}</p>
-                              <div className="inline-flex gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900">
+                              <div className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit">
                                 {opcionesCondicion.map((opcion) => {
                                   const seleccionado = datos[campo.key] === opcion;
                                   return (
@@ -641,7 +641,7 @@ export default function InspeccionEppForm() {
                           </div>
                           <div className="mt-4 grid gap-3">
                             <label className="text-sm font-semibold text-slate-700">Condición</label>
-                            <div data-required-id={`otroEppCondicion-${index}`} className="inline-flex w-fit gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900">
+                            <div data-required-id={`otroEppCondicion-${index}`} className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit">
                               {opcionesCondicion.map((opcion) => {
                                 const seleccionado = otroEpp.condicion === opcion;
                                 return (
@@ -681,7 +681,7 @@ export default function InspeccionEppForm() {
                       setModalFirmaAbierto(true);
                     }}
                     data-required-id="firmaColaborador"
-                    className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+                    className="w-full rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white sm:w-auto"
                   >
                     Clic para firmar
                   </button>

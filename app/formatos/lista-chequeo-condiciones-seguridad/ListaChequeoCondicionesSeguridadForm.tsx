@@ -53,7 +53,7 @@ const campoSeleccion =
   "mt-2 block h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const etiquetaCampo = "text-xs font-bold uppercase tracking-wide text-slate-600";
 const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
-const encabezadoSeccion = "flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const encabezadoSeccion = "flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
 const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
 
@@ -216,7 +216,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-[1500px]">
-        <div className="mb-6 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm">
+        <div className="mb-6 overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-sm">
           <div className="grid min-w-[860px] grid-cols-[20%_1fr_22%] text-xs text-slate-950">
             <div className="flex min-h-[112px] items-center justify-center border-r border-slate-400 bg-white px-5" aria-label="Espacio reservado para el logo">
               <span className="text-2xl font-bold lowercase tracking-tight text-emerald-800">incomineria</span>

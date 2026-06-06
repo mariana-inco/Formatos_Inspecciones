@@ -81,7 +81,7 @@ const campoSeleccion =
   "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const etiquetaCampo = "text-xs font-bold uppercase tracking-wide text-slate-600";
 const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
-const encabezadoSeccion = "flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const encabezadoSeccion = "flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-5";
 const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
@@ -378,7 +378,7 @@ export default function VerificacionAlcoholDrogasForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-8 sm:px-12">
+    <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
@@ -578,7 +578,7 @@ export default function VerificacionAlcoholDrogasForm() {
 
                     <div className="md:col-span-2">
                       <label className={etiquetaCampo}>Imagen evidencia</label>
-                      <div className="mt-3 flex items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+                      <div className="mt-3 flex flex-col gap-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center">
                         <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-900">
                           <Upload className="size-5" aria-hidden="true" />
                         </div>
@@ -607,7 +607,7 @@ export default function VerificacionAlcoholDrogasForm() {
                     <p className="mt-1 text-sm text-slate-600">{datos.firmaPersonaEvaluadaRegistrada ? "Firma registrada" : "Pendiente de firma"}</p>
                     </div>
                   </div>
-                  <button type="button" onClick={() => setModalFirmaAbierto(true)} data-required-id="firmaPersonaEvaluada" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+                  <button type="button" onClick={() => setModalFirmaAbierto(true)} data-required-id="firmaPersonaEvaluada" className="w-full rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white sm:w-auto">
                     Clic para firmar
                   </button>
                 </div>
@@ -688,7 +688,82 @@ export default function VerificacionAlcoholDrogasForm() {
           {registros.length > 0 ? (
             <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900">Registros agregados</h2>
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4 grid gap-4 md:hidden">
+                {registros.map((registro, index) => (
+                  <article key={`mobile-${registro.empresaPersonaEvaluada}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase text-emerald-800">N° {index + 1}</p>
+                        <h3 className="mt-1 text-base font-bold uppercase text-slate-950">{registro.personaPrueba}</h3>
+                        <p className="mt-1 text-sm font-semibold text-slate-600">{registro.cargoPersona}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => editarFirmaRegistro(index)}
+                          aria-label="Editar firma"
+                          title="Editar firma"
+                          className="grid size-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-700"
+                        >
+                          <span aria-hidden="true" className="text-[15px] leading-none">✎</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => eliminarRegistro(index)}
+                          aria-label="Eliminar celda"
+                          title="Eliminar celda"
+                          className="grid size-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-700"
+                        >
+                          <span aria-hidden="true" className="text-[14px] leading-none">⌫</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Numero de identificación</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">{registro.numeroIdentificacionPersona}</p>
+                      </div>
+                      <div className="rounded-xl bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Empresa o contratista</p>
+                        <p className="mt-1 text-sm font-semibold uppercase text-slate-950">{registro.empresaContratistaPersona}</p>
+                      </div>
+                      <div className="rounded-xl bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Resultado primera prueba inicial</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">{registro.resultadoPrimeraPruebaInicial}</p>
+                        <p className="text-[11px] text-slate-600">{registro.gradoDetectado} mg / 100ml</p>
+                      </div>
+                      <div className="rounded-xl bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Resultado segunda prueba confirmatoria</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">-</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Imagen</p>
+                        {registro.imagenEvidenciaUrl ? (
+                          <img src={registro.imagenEvidenciaUrl} alt="Imagen evidencia" className="mt-2 h-24 w-full object-contain" />
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-600">Sin Imagen</p>
+                        )}
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Firma</p>
+                        {registro.firmaPersonaEvaluada ? (
+                          <div className="mt-2 flex h-24 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
+                            <img src={registro.firmaPersonaEvaluada} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-sm text-slate-600">Pendiente</p>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="mt-4 hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[1180px] table-fixed divide-y divide-slate-200 text-xs">
                   <colgroup>
                     <col className="w-[4%]" />

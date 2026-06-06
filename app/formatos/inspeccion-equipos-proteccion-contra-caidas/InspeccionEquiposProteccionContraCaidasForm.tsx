@@ -43,7 +43,7 @@ const claseCampoTexto =
 const claseCampoSeleccion =
   "mt-2 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
-const encabezadoSeccion = "flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
+const encabezadoSeccion = "flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
 const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
 
@@ -363,7 +363,64 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     detailTitle: string;
   }) => (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="grid gap-4 p-4 md:hidden">
+        {opciones.items.map((item) => {
+          const concepto = respuestasListaChequeo[item.key]?.concepto || "";
+
+          return (
+            <article key={`mobile-${opciones.mode}-${item.key}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-bold leading-5 text-slate-950">{item.factor}</div>
+              {Array.isArray(item.instrucciones) ? (
+                <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-5 text-slate-700">
+                  {item.instrucciones.map((instruccion) => (
+                    <li key={instruccion}>{instruccion}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-xs leading-5 text-slate-700">{item.instrucciones}</p>
+              )}
+
+              <div className="mt-4">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-950">CONCEPTO</label>
+                {opciones.mode === "principal" ? (
+                  <select
+                    data-required-id={`concepto-${item.key}`}
+                    value={concepto}
+                    onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
+                    className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <option value="">--Seleccione--</option>
+                    <option value="ACEPTADO">ACEPTADO</option>
+                    <option value="RECHAZADO">RECHAZADO</option>
+                  </select>
+                ) : (
+                  <div className="mt-2 flex h-11 w-full items-center rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-bold text-emerald-950 shadow-sm">
+                    {concepto || "-"}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-950">{opciones.detailTitle}</label>
+                {opciones.mode === "principal" ? (
+                  <input
+                    value={respuestasListaChequeo[item.key]?.comentario || ""}
+                    onChange={(e) => manejarCambioComentario(item.key, e.target.value)}
+                    className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    placeholder="Solo si aplica"
+                  />
+                ) : (
+                  <div className="mt-2 flex min-h-11 w-full items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm">
+                    {respuestasListaChequeo[item.key]?.comentario || ""}
+                  </div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[920px] table-fixed border-separate border-spacing-0 text-sm">
         <colgroup>
           <col className="w-[54%]" />
@@ -439,7 +496,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-8 sm:px-12">
+    <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
