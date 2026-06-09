@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
 import type { CampoEpp, CampoEppKey, CondicionEpp } from "./data";
 
@@ -389,14 +390,43 @@ export default function InspeccionEppForm() {
       const result = (await response.json()) as { fileName: string; filePath: string };
       console.log("Respuesta guardada en JSON:", result);
       console.log("Registro completo del formulario:", respuestaJson);
+      localStorage.removeItem("borrador-inspeccion-epp");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
+  const estadoProteccion = { datos, registros, indiceEdicion };
+  const estadoInicialProteccion = {
+    datos: datosIniciales,
+    registros: [] as RegistroEpp[],
+    indiceEdicion: null as number | null,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+      <ProteccionDatosFormulario
+        storageKey="borrador-inspeccion-epp"
+        datos={estadoProteccion}
+        datosIniciales={estadoInicialProteccion}
+        onRestaurar={(borrador) => {
+          setDatos(borrador.datos);
+          setRegistros(borrador.registros);
+          setIndiceEdicion(borrador.indiceEdicion);
+          setFirmaTieneTrazo(false);
+          setCantidadOtrosAbierta(false);
+          referenciaFirma.current?.clear();
+        }}
+        onDescartar={() => {
+          setDatos(datosIniciales);
+          setRegistros([]);
+          setIndiceEdicion(null);
+          setFirmaTieneTrazo(false);
+          setCantidadOtrosAbierta(false);
+          referenciaFirma.current?.clear();
+        }}
+      />
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">

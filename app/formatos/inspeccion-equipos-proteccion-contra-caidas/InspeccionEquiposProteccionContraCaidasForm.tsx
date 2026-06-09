@@ -6,6 +6,7 @@ import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import { CalendarDays, Check, ClipboardList, ImageUp, PenLine, Settings, ShieldCheck } from "lucide-react";
+import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
 import {
   decisionOptions as opcionesDecision,
   inspectionTypeKeys as clavesTiposInspeccion,
@@ -67,6 +68,19 @@ type DatosFirma = {
   responsableFirmado: boolean;
 };
 
+const firmasIniciales: DatosFirma = {
+  inspectorIdentificacion: "",
+  inspectorNombre: "",
+  inspectorCargo: "",
+  inspectorFirma: "",
+  inspectorFirmado: false,
+  responsableNombre: "",
+  responsableIdentificacion: "",
+  responsableCargo: "",
+  responsableFirma: "",
+  responsableFirmado: false,
+};
+
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const enfocarCampoFaltante = (id: string) => {
@@ -118,20 +132,41 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [rolModalFirma, setRolModalFirma] = useState<"inspector" | "responsable" | null>(null);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
-  const [firmas, setFirmas] = useState<DatosFirma>({
-    inspectorIdentificacion: "",
-    inspectorNombre: "",
-    inspectorCargo: "",
-    inspectorFirma: "",
-    inspectorFirmado: false,
-    responsableNombre: "",
-    responsableIdentificacion: "",
-    responsableCargo: "",
-    responsableFirma: "",
-    responsableFirmado: false,
-  });
+  const [firmas, setFirmas] = useState<DatosFirma>(firmasIniciales);
 
   const listaChequeoActual = useMemo(() => tiposInspeccion[tipoInspeccionSeleccionado].checklist || [], [tipoInspeccionSeleccionado]);
+  const esInspeccionArnes = tipoInspeccionSeleccionado === "arnes";
+  const esInspeccionEslingas = tipoInspeccionSeleccionado === "eslingas";
+  const esInspeccionDescendedor = tipoInspeccionSeleccionado === "descendedor";
+  const esInspeccionMosqueton = tipoInspeccionSeleccionado === "mosqueton";
+  const esInspeccionAutoretracto = tipoInspeccionSeleccionado === "autoretracto";
+  const esInspeccionFreno = tipoInspeccionSeleccionado === "freno";
+  const esInspeccionTieOff = tipoInspeccionSeleccionado === "tieoff";
+  const esInspeccionLineaVida = tipoInspeccionSeleccionado === "linea-vida";
+  const usaMaterialEquipo =
+    esInspeccionArnes ||
+    esInspeccionEslingas ||
+    esInspeccionDescendedor ||
+    esInspeccionMosqueton ||
+    esInspeccionAutoretracto ||
+    esInspeccionFreno ||
+    esInspeccionTieOff ||
+    esInspeccionLineaVida;
+  const etiquetaCaracteristicaTecnica = esInspeccionArnes
+    ? "Tipo de material del arnés"
+    : esInspeccionEslingas
+      ? "Tipo de material de la eslinga"
+      : esInspeccionDescendedor
+        ? "Material del equipo"
+        : esInspeccionMosqueton
+          ? "Tipo de material del equipo"
+          : esInspeccionAutoretracto
+            ? "Tipo de polea - autoretráctil"
+            : esInspeccionTieOff
+              ? "Tipo de Tie - Off"
+              : esInspeccionLineaVida
+                ? "Longitud de línea de vida"
+                : "Tipo de freno";
   const primeraTablaCompleta = useMemo(
     () => listaChequeoActual.length > 0 && listaChequeoActual.every((item) => Boolean(respuestasListaChequeo[item.key]?.concepto)),
     [listaChequeoActual, respuestasListaChequeo]
@@ -159,12 +194,12 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     if (!datosGenerales.modelo) camposFaltantes.push("Modelo");
     if (!datosGenerales.numeroSerie) camposFaltantes.push("Número de serie");
     if (!datosGenerales.numeroInterno) camposFaltantes.push("Número interno");
-    if (!datosGenerales.periodicidad) camposFaltantes.push("Periodicidad");
+    if (!datosGenerales.periodicidad) camposFaltantes.push("Periodicidad de la inspección");
     if (!datosGenerales.fechaFabricacion) camposFaltantes.push("Fecha de fabricación");
     if (!datosGenerales.certificado) camposFaltantes.push("Certificado");
     if (!datosGenerales.fechaCompra) camposFaltantes.push("Fecha de compra");
     if (!datosGenerales.numeroLote) camposFaltantes.push("Número de lote");
-    if (!datosGenerales.tipoFreno) camposFaltantes.push("Tipo de freno");
+    if (!datosGenerales.tipoFreno) camposFaltantes.push(etiquetaCaracteristicaTecnica);
     if (!datosGenerales.fechaPrimeraUtilizacion) camposFaltantes.push("Fecha primera utilización");
 
     return camposFaltantes;
@@ -362,6 +397,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
       const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
       console.log("Respuesta guardada en JSON:", resultadoGuardado);
       console.log("Registro completo del formulario:", respuestaJson);
+      localStorage.removeItem("borrador-inspeccion-equipos-proteccion-contra-caidas");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
@@ -506,8 +542,72 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     </div>
   );
 
+  const estadoProteccion = {
+    datosGenerales,
+    urlVistaPreviaImagen,
+    nombreImagen,
+    datosRegistrados,
+    tipoInspeccionSeleccionado,
+    selectorInspeccionContraido,
+    decisionFinal,
+    comentariosFinales,
+    respuestasListaChequeo,
+    mostrarDatosAdicionales,
+    firmas,
+  };
+  const estadoInicialProteccion = {
+    datosGenerales: datosGeneralesIniciales,
+    urlVistaPreviaImagen: "",
+    nombreImagen: "",
+    datosRegistrados: false,
+    tipoInspeccionSeleccionado: clavesTiposInspeccion[0],
+    selectorInspeccionContraido: false,
+    decisionFinal: "",
+    comentariosFinales: "",
+    respuestasListaChequeo: {} as Record<string, RespuestaListaChequeo>,
+    mostrarDatosAdicionales: false,
+    firmas: firmasIniciales,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+      <ProteccionDatosFormulario
+        storageKey="borrador-inspeccion-equipos-proteccion-contra-caidas"
+        datos={estadoProteccion}
+        datosIniciales={estadoInicialProteccion}
+        onRestaurar={(borrador) => {
+          setDatosGenerales(borrador.datosGenerales);
+          setUrlVistaPreviaImagen(borrador.urlVistaPreviaImagen);
+          setNombreImagen(borrador.nombreImagen);
+          setDatosRegistrados(borrador.datosRegistrados);
+          setTipoInspeccionSeleccionado(borrador.tipoInspeccionSeleccionado);
+          setSelectorInspeccionContraido(borrador.selectorInspeccionContraido);
+          setDecisionFinal(borrador.decisionFinal);
+          setComentariosFinales(borrador.comentariosFinales);
+          setRespuestasListaChequeo(borrador.respuestasListaChequeo);
+          setMostrarDatosAdicionales(borrador.mostrarDatosAdicionales);
+          setFirmas(borrador.firmas);
+          setFirmaTieneTrazo(false);
+          setRolModalFirma(null);
+          referenciaFirma.current?.clear();
+        }}
+        onDescartar={() => {
+          setDatosGenerales(datosGeneralesIniciales);
+          setUrlVistaPreviaImagen("");
+          setNombreImagen("");
+          setDatosRegistrados(false);
+          setTipoInspeccionSeleccionado(clavesTiposInspeccion[0]);
+          setSelectorInspeccionContraido(false);
+          setDecisionFinal("");
+          setComentariosFinales("");
+          setRespuestasListaChequeo({});
+          setMostrarDatosAdicionales(false);
+          setFirmas(firmasIniciales);
+          setFirmaTieneTrazo(false);
+          setRolModalFirma(null);
+          referenciaFirma.current?.clear();
+        }}
+      />
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
@@ -534,7 +634,11 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-2 gap-3 border-t-2 border-blue-500 pt-8 md:grid-cols-4">
+        <div
+          className={`mb-6 border-t-2 border-blue-500 pt-8 ${
+            selectorInspeccionContraido ? "flex justify-center" : "grid grid-cols-2 gap-3 md:grid-cols-4"
+          }`}
+        >
           {(selectorInspeccionContraido ? [tipoInspeccionSeleccionado] : clavesTiposInspeccion).map((tipo) => {
             const estaSeleccionado = tipoInspeccionSeleccionado === tipo;
             return (
@@ -543,7 +647,9 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 type="button"
                 onClick={() => manejarSeleccionTipoInspeccion(tipo)}
                 aria-pressed={estaSeleccionado}
-                className={`relative flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border px-2.5 py-3 text-center text-[13px] font-bold uppercase text-white shadow-sm transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 md:min-h-[92px] md:px-3 ${
+                className={`relative flex min-h-22 flex-col items-center justify-center gap-2 rounded-2xl border px-2.3 py-3 text-center text-[14px] font-bold uppercase text-white shadow-sm transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 md:min-h-[80px] md:px-3 ${
+                  selectorInspeccionContraido ? "w-full max-w-xs" : ""
+                } ${
                   estaSeleccionado
                     ? "border-emerald-500 bg-emerald-800 text-white ring-2 ring-emerald-300"
                     : "border-slate-800 bg-slate-800 hover:bg-slate-700"
@@ -662,24 +768,32 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 </div>
                 <div className="grid gap-4 p-5 md:grid-cols-2">
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Periodicidad {marcaObligatorio}</label>
-                    <select name="periodicidad" value={datosGenerales.periodicidad} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
-                      <option value="">Seleccione una periodicidad</option>
-                      <option value="Mensual">Mensual</option>
-                      <option value="Trimestral">Trimestral</option>
-                      <option value="Semestral">Semestral</option>
-                      <option value="Anual">Anual</option>
-                    </select>
+                    <label className="text-sm font-semibold text-slate-700">Periodicidad de la inspección {marcaObligatorio}</label>
+                    {usaMaterialEquipo ? (
+                      <input name="periodicidad" value={datosGenerales.periodicidad} onChange={manejarCambioCampo} className={claseCampoTexto} />
+                    ) : (
+                      <select name="periodicidad" value={datosGenerales.periodicidad} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
+                        <option value="">Seleccione una periodicidad</option>
+                        <option value="Mensual">Mensual</option>
+                        <option value="Trimestral">Trimestral</option>
+                        <option value="Semestral">Semestral</option>
+                        <option value="Anual">Anual</option>
+                      </select>
+                    )}
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-slate-700">Tipo de freno</label>
-                    <select name="tipoFreno" value={datosGenerales.tipoFreno} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
-                      <option value="">Seleccione el tipo de freno</option>
-                      <option value="Manual">Manual</option>
-                      <option value="Automático">Automático</option>
-                      <option value="Autoretráctil">Autoretráctil</option>
-                      <option value="No aplica">No aplica</option>
-                    </select>
+                    <label className="text-sm font-semibold text-slate-700">{etiquetaCaracteristicaTecnica}</label>
+                    {usaMaterialEquipo ? (
+                      <input name="tipoFreno" value={datosGenerales.tipoFreno} onChange={manejarCambioCampo} className={claseCampoTexto} />
+                    ) : (
+                      <select name="tipoFreno" value={datosGenerales.tipoFreno} onChange={manejarCambioCampo} className={claseCampoSeleccion}>
+                        <option value="">Seleccione el tipo de freno</option>
+                        <option value="Manual">Manual</option>
+                        <option value="Automático">Automático</option>
+                        <option value="Autoretráctil">Autoretráctil</option>
+                        <option value="No aplica">No aplica</option>
+                      </select>
+                    )}
                   </div>
                 </div>
               </section>
@@ -750,7 +864,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                     ["Certificado", datosGenerales.certificado],
                     ["Fecha de compra", datosGenerales.fechaCompra],
                     ["Número de lote", datosGenerales.numeroLote],
-                    ["Tipo de freno", datosGenerales.tipoFreno],
+                    [etiquetaCaracteristicaTecnica, datosGenerales.tipoFreno],
                     ["Fecha primera utilización", datosGenerales.fechaPrimeraUtilizacion],
                   ].map((item) => (
                     <div key={String(item[0])} className="grid grid-cols-[1fr_1fr] gap-3 rounded bg-white px-4 py-3">

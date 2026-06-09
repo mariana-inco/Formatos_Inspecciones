@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { ChangeEvent } from "react";
-import { ClipboardCheck, ClipboardList, FileText, ListChecks, Settings, UserCog } from "lucide-react";
+import { ClipboardCheck, ClipboardList, FileText, Settings, UserCog } from "lucide-react";
+import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
 import { FORM_META, opcionesCantidadOtros, opcionesEstado, seccionesChequeo } from "./data";
 import type { EstadoChequeo } from "./data";
 
@@ -56,6 +57,21 @@ const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-w
 const encabezadoSeccion = "flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
 const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const marcaObligatorio = <span className="text-red-600">*</span>;
+const claseBotonEstado = (opcion: EstadoChequeo, seleccionado: boolean) => {
+  if (opcion === "Cumple") {
+    return seleccionado
+      ? "border-emerald-500 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200"
+      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-slate-50";
+  }
+  if (opcion === "No Cumple") {
+    return seleccionado
+      ? "border-red-400 bg-red-100 text-red-800 ring-2 ring-red-200"
+      : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-slate-50";
+  }
+  return seleccionado
+    ? "border-slate-400 bg-slate-200 text-slate-800 ring-2 ring-slate-200"
+    : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:bg-slate-50";
+};
 
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
@@ -207,14 +223,37 @@ export default function ListaChequeoCondicionesSeguridadForm() {
       const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
       console.log("Respuesta guardada en JSON:", resultadoGuardado);
       console.log("Registro completo del formulario:", respuestaJson);
+      localStorage.removeItem("borrador-lista-chequeo-condiciones-seguridad");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
+  const estadoProteccion = { datosGenerales, respuestas, otrosDetalle };
+  const estadoInicialProteccion = {
+    datosGenerales: datosGeneralesIniciales,
+    respuestas: crearRespuestasIniciales(),
+    otrosDetalle: [] as OtroDetalle[],
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+      <ProteccionDatosFormulario
+        storageKey="borrador-lista-chequeo-condiciones-seguridad"
+        datos={estadoProteccion}
+        datosIniciales={estadoInicialProteccion}
+        onRestaurar={(borrador) => {
+          setDatosGenerales(borrador.datosGenerales);
+          setRespuestas(borrador.respuestas);
+          setOtrosDetalle(borrador.otrosDetalle);
+        }}
+        onDescartar={() => {
+          setDatosGenerales(datosGeneralesIniciales);
+          setRespuestas(crearRespuestasIniciales());
+          setOtrosDetalle([]);
+        }}
+      />
       <div className="mx-auto w-full max-w-[1500px]">
         <div className="mb-6 overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-sm">
           <div className="grid min-w-[860px] grid-cols-[20%_1fr_22%] text-xs text-slate-950">
@@ -252,21 +291,21 @@ export default function ListaChequeoCondicionesSeguridadForm() {
               <h2 className="text-base font-bold uppercase tracking-wide text-slate-950">I. DATOS GENERALES DE LA INSPECCIÓN</h2>
             </div>
             <div className="p-5">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div>
               <label className={etiquetaCampo}>Email {marcaObligatorio}</label>
               <input name="email" type="email" value={datosGenerales.email} onChange={manejarCambioDatos} placeholder="nombre@empresa.co" className={campoTexto} />
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>INSPECTOR {marcaObligatorio}</label>
                 <input name="inspector" value={datosGenerales.inspector} onChange={manejarCambioDatos} className={campoTexto} />
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>ÁREA INSPECCIONADA {marcaObligatorio}</label>
                 <input name="areaInspeccionada" value={datosGenerales.areaInspeccionada} onChange={manejarCambioDatos} className={campoTexto} />
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>FECHA {marcaObligatorio}</label>
                 <input name="fecha" type="date" value={datosGenerales.fecha} onChange={manejarCambioDatos} className={campoFecha} />
               </div>
@@ -284,19 +323,19 @@ export default function ListaChequeoCondicionesSeguridadForm() {
             </div>
 
             <div className="grid gap-4 p-5 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>Maquinaria - Herramientas {marcaObligatorio}</label>
                 <input name="maquinariaHerramientas" value={datosGenerales.maquinariaHerramientas} onChange={manejarCambioDatos} className={campoTexto} />
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>Numero de trabajadores del área {marcaObligatorio}</label>
                 <input name="numeroTrabajadoresArea" value={datosGenerales.numeroTrabajadoresArea} onChange={manejarCambioDatos} inputMode="numeric" pattern="[0-9]*" className={campoTexto} />
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>Puestos de trabajo {marcaObligatorio}</label>
                 <input name="puestosTrabajo" value={datosGenerales.puestosTrabajo} onChange={manejarCambioDatos} className={campoTexto} />
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div>
                 <label className={etiquetaCampo}>Sustancias Utilizadas {marcaObligatorio}</label>
                 <input name="sustanciasUtilizadas" value={datosGenerales.sustanciasUtilizadas} onChange={manejarCambioDatos} className={campoTexto} />
               </div>
@@ -305,28 +344,30 @@ export default function ListaChequeoCondicionesSeguridadForm() {
 
           <div className="mt-6 space-y-5">
             {seccionesChequeo.map((seccion) => (
-              <section key={seccion.titulo} className={tarjetaSeccion}>
-                <div className={encabezadoSeccion}>
-                  <div className={iconoSeccion}>
-                    <ListChecks className="size-6" aria-hidden="true" />
-                  </div>
-                  <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">{seccion.titulo}</h3>
+              <section key={seccion.titulo} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="bg-emerald-800 px-5 py-4 sm:px-6">
+                  <h3 className="text-base font-bold uppercase tracking-wide text-white sm:text-lg">{seccion.titulo}</h3>
                 </div>
 
-                <div className="grid gap-4 p-5">
+                <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-2">
                   {seccion.items.map((item) => (
-                    <div key={item.key} className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
-                      <div className="grid gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(260px,360px)] lg:items-center">
-                        <p className={etiquetaCampo}>{item.label}</p>
-                        <div data-required-id={`estado-${item.key}`} className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" tabIndex={-1}>
+                    <div key={item.key} className="rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+                      <div className="grid gap-4 xl:grid-cols-[minmax(160px,1fr)_auto] xl:items-center">
+                        <p className="text-sm font-bold uppercase text-slate-950">{item.label}</p>
+                        <div data-required-id={`estado-${item.key}`} className="flex w-full flex-wrap gap-2 rounded-xl bg-slate-50 p-2 text-sm font-semibold text-slate-700 xl:w-auto" tabIndex={-1}>
                           {opcionesEstado.map((opcion) => (
-                            <label key={`${item.key}-${opcion}`} className="inline-flex items-center gap-2">
+                            <label
+                              key={`${item.key}-${opcion}`}
+                              className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-sm transition sm:text-sm xl:flex-none ${
+                                claseBotonEstado(opcion, respuestas[item.key]?.estado === opcion)
+                              }`}
+                            >
                               <input
                                 type="radio"
                                 name={`estado-${item.key}`}
                                 checked={respuestas[item.key]?.estado === opcion}
                                 onChange={() => manejarEstadoItem(item.key, opcion)}
-                                className="size-4 accent-emerald-700"
+                                className="sr-only"
                               />
                               {opcion}
                             </label>
@@ -334,7 +375,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
                         </div>
                       </div>
 
-                      <div className="mt-4">
+                      <div className="mt-4 border-t border-slate-200 pt-4">
                         <label className={etiquetaCampo}>Observaciones</label>
                         <input value={respuestas[item.key]?.observaciones || ""} onChange={(e) => manejarObservacionItem(item.key, e.target.value)} className={campoTexto} />
                       </div>
@@ -378,15 +419,20 @@ export default function ListaChequeoCondicionesSeguridadForm() {
                           />
                         </div>
 
-                        <div data-required-id={`otroEstado-${index}`} className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" tabIndex={-1}>
+                        <div data-required-id={`otroEstado-${index}`} className="flex w-full flex-wrap gap-2 rounded-xl bg-slate-50 p-2 text-sm font-semibold text-slate-700 lg:w-auto" tabIndex={-1}>
                           {opcionesEstado.map((opcion) => (
-                            <label key={`otro-${index}-${opcion}`} className="inline-flex items-center gap-2">
+                            <label
+                              key={`otro-${index}-${opcion}`}
+                              className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-sm transition sm:text-sm lg:flex-none ${
+                                claseBotonEstado(opcion, otro.estado === opcion)
+                              }`}
+                            >
                               <input
                                 type="radio"
                                 name={`otroEstado-${index}`}
                                 checked={otro.estado === opcion}
                                 onChange={() => manejarCambioOtro(index, "estado", opcion)}
-                                className="size-4 accent-emerald-700"
+                                className="sr-only"
                               />
                               {opcion}
                             </label>

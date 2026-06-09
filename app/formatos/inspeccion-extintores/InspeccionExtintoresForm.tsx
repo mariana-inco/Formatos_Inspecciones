@@ -5,6 +5,7 @@ import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import { ClipboardList, FireExtinguisher, PenLine, UserCog } from "lucide-react";
+import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F003",
@@ -339,14 +340,44 @@ export default function InspeccionExtintoresForm() {
       const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
       console.log("Respuesta guardada en JSON:", resultadoGuardado);
       console.log("Registro completo del formulario:", respuestaJson);
+      localStorage.removeItem("borrador-inspeccion-extintores");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
+  const estadoProteccion = { datosInspeccion, registro, registros, indiceEdicion };
+  const estadoInicialProteccion = {
+    datosInspeccion: datosInspeccionIniciales,
+    registro: registroInicial,
+    registros: [] as RegistroExtintor[],
+    indiceEdicion: null as number | null,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+      <ProteccionDatosFormulario
+        storageKey="borrador-inspeccion-extintores"
+        datos={estadoProteccion}
+        datosIniciales={estadoInicialProteccion}
+        onRestaurar={(borrador) => {
+          setDatosInspeccion(borrador.datosInspeccion);
+          setRegistro(borrador.registro);
+          setRegistros(borrador.registros);
+          setIndiceEdicion(borrador.indiceEdicion);
+          setFirmaTieneTrazo(false);
+          referenciaFirma.current?.clear();
+        }}
+        onDescartar={() => {
+          setDatosInspeccion(datosInspeccionIniciales);
+          setRegistro(registroInicial);
+          setRegistros([]);
+          setIndiceEdicion(null);
+          setFirmaTieneTrazo(false);
+          referenciaFirma.current?.clear();
+        }}
+      />
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">

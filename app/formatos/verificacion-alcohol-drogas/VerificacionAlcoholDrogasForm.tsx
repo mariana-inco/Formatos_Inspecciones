@@ -5,6 +5,7 @@ import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import { ClipboardList, PenLine, ShieldCheck, Upload, UserCog, UsersRound } from "lucide-react";
+import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F020",
@@ -36,6 +37,8 @@ type DatosFormulario = {
   cargoPersona: string;
   resultadoPrimeraPruebaInicial: ResultadoPrueba;
   gradoDetectado: string;
+  resultadoSegundaPruebaConfirmatoria: ResultadoPrueba;
+  gradoDetectadoSegundaPrueba: string;
   imagenEvidenciaNombre: string;
   imagenEvidenciaUrl: string;
   firmaPersonaEvaluada: string;
@@ -65,6 +68,8 @@ const datosIniciales: DatosFormulario = {
   cargoPersona: "",
   resultadoPrimeraPruebaInicial: "",
   gradoDetectado: "",
+  resultadoSegundaPruebaConfirmatoria: "",
+  gradoDetectadoSegundaPrueba: "",
   imagenEvidenciaNombre: "",
   imagenEvidenciaUrl: "",
   firmaPersonaEvaluada: "",
@@ -131,8 +136,31 @@ export default function VerificacionAlcoholDrogasForm() {
     const campo = name as keyof DatosFormulario;
     let siguienteValor = camposSinNumeros.has(campo) ? quitarNumeros(value) : value;
     if (campo === "identificacionRealizaPrueba" || campo === "numeroIdentificacionPersona") siguienteValor = soloNumeros(value);
-    if (campo === "gradoDetectado") siguienteValor = soloDecimal(value);
-    setDatos((prev) => ({ ...prev, [campo]: siguienteValor }));
+    if (campo === "gradoDetectado" || campo === "gradoDetectadoSegundaPrueba") siguienteValor = soloDecimal(value);
+    setDatos((prev) => ({
+      ...prev,
+      [campo]: siguienteValor,
+      ...(campo === "resultadoPrimeraPruebaInicial" && siguienteValor !== "POSITIVO"
+        ? {
+            resultadoSegundaPruebaConfirmatoria: "",
+            gradoDetectadoSegundaPrueba: "",
+            imagenEvidenciaNombre: "",
+            imagenEvidenciaUrl: "",
+          }
+        : {}),
+      ...(campo === "resultadoSegundaPruebaConfirmatoria" && siguienteValor !== "POSITIVO"
+        ? {
+            imagenEvidenciaNombre: "",
+            imagenEvidenciaUrl: "",
+          }
+        : {}),
+    }));
+    if (
+      (campo === "resultadoPrimeraPruebaInicial" && siguienteValor !== "POSITIVO") ||
+      (campo === "resultadoSegundaPruebaConfirmatoria" && siguienteValor !== "POSITIVO")
+    ) {
+      setImagenInputKey((prev) => prev + 1);
+    }
   };
 
   const manejarCargaImagen = (e: ChangeEvent<HTMLInputElement>) => {
@@ -219,8 +247,6 @@ export default function VerificacionAlcoholDrogasForm() {
       identificacionRealizaPrueba: prev.identificacionRealizaPrueba,
       nombreRealizaPrueba: prev.nombreRealizaPrueba,
       cargoRealizaPrueba: prev.cargoRealizaPrueba,
-      empresaPersonaEvaluada: prev.empresaPersonaEvaluada,
-      empresaContratistaPersona: prev.empresaPersonaEvaluada === "INCOMINERIA" ? "INCOMINERIA" : "",
     }));
     setIndiceEdicion(null);
     setFirmaTieneTrazo(false);
@@ -247,11 +273,18 @@ export default function VerificacionAlcoholDrogasForm() {
     if (!datos.cargoPersona) camposFaltantes.push("cargoPersona");
     if (!datos.resultadoPrimeraPruebaInicial) camposFaltantes.push("resultadoPrimeraPruebaInicial");
     if (!datos.gradoDetectado) camposFaltantes.push("gradoDetectado");
+    if (datos.resultadoPrimeraPruebaInicial === "POSITIVO" && !datos.resultadoSegundaPruebaConfirmatoria) {
+      camposFaltantes.push("resultadoSegundaPruebaConfirmatoria");
+    }
+    if (datos.resultadoPrimeraPruebaInicial === "POSITIVO" && !datos.gradoDetectadoSegundaPrueba) {
+      camposFaltantes.push("gradoDetectadoSegundaPrueba");
+    }
+    if (datos.resultadoSegundaPruebaConfirmatoria === "POSITIVO" && !datos.imagenEvidenciaUrl) camposFaltantes.push("imagenEvidencia");
     if (!datos.firmaPersonaEvaluadaRegistrada) camposFaltantes.push("firmaPersonaEvaluada");
     if (!datos.hayTestigo) camposFaltantes.push("hayTestigo");
     if (datos.hayTestigo === "SI" && !datos.nombreTestigo) camposFaltantes.push("nombreTestigo");
     if (datos.hayTestigo === "SI" && !datos.cargoTestigo) camposFaltantes.push("cargoTestigo");
-    if (!datos.confirmar) camposFaltantes.push("confirmar");
+    if (datos.hayTestigo === "SI" && !datos.confirmar) camposFaltantes.push("confirmar");
 
     return camposFaltantes;
   };
@@ -323,11 +356,16 @@ export default function VerificacionAlcoholDrogasForm() {
         cargo: registro.cargoPersona,
         resultadoPrimeraPruebaInicial: registro.resultadoPrimeraPruebaInicial,
         gradoDetectadoMg100ml: registro.gradoDetectado,
-        imagenEvidencia: {
-          nombreArchivo: registro.imagenEvidenciaNombre,
-          imagenAdjunta: Boolean(registro.imagenEvidenciaUrl),
-          dataUrl: registro.imagenEvidenciaUrl,
-        },
+        resultadoSegundaPruebaConfirmatoria: registro.resultadoSegundaPruebaConfirmatoria,
+        gradoDetectadoSegundaPruebaMg100ml: registro.gradoDetectadoSegundaPrueba,
+        imagenEvidencia:
+          registro.resultadoSegundaPruebaConfirmatoria === "POSITIVO"
+            ? {
+                nombreArchivo: registro.imagenEvidenciaNombre,
+                imagenAdjunta: Boolean(registro.imagenEvidenciaUrl),
+                dataUrl: registro.imagenEvidenciaUrl,
+              }
+            : null,
         firma: registro.firmaPersonaEvaluada,
         firmaRegistrada: registro.firmaPersonaEvaluadaRegistrada,
       },
@@ -371,14 +409,43 @@ export default function VerificacionAlcoholDrogasForm() {
       const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
       console.log("Respuesta guardada en JSON:", resultadoGuardado);
       console.log("Registro completo del formulario:", respuestaJson);
+      localStorage.removeItem("borrador-verificacion-alcohol-drogas");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
+  const estadoProteccion = { datos, registros, indiceEdicion };
+  const estadoInicialProteccion = {
+    datos: datosIniciales,
+    registros: [] as RegistroPersona[],
+    indiceEdicion: null as number | null,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+      <ProteccionDatosFormulario
+        storageKey="borrador-verificacion-alcohol-drogas"
+        datos={estadoProteccion}
+        datosIniciales={estadoInicialProteccion}
+        onRestaurar={(borrador) => {
+          setDatos(borrador.datos);
+          setRegistros(borrador.registros);
+          setIndiceEdicion(borrador.indiceEdicion);
+          setFirmaTieneTrazo(false);
+          setImagenInputKey((prev) => prev + 1);
+          referenciaFirma.current?.clear();
+        }}
+        onDescartar={() => {
+          setDatos(datosIniciales);
+          setRegistros([]);
+          setIndiceEdicion(null);
+          setFirmaTieneTrazo(false);
+          setImagenInputKey((prev) => prev + 1);
+          referenciaFirma.current?.clear();
+        }}
+      />
       <div className="w-full max-w-full">
         <div className="mb-6 overflow-x-auto bg-white">
           <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
@@ -576,24 +643,57 @@ export default function VerificacionAlcoholDrogasForm() {
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <label className={etiquetaCampo}>Imagen evidencia</label>
-                      <div className="mt-3 flex flex-col gap-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center">
-                        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-900">
-                          <Upload className="size-5" aria-hidden="true" />
+                    {datos.resultadoPrimeraPruebaInicial === "POSITIVO" ? (
+                      <>
+                        <div>
+                          <label className={etiquetaCampo}>Resultado segunda prueba confirmatoria {marcaObligatorio}</label>
+                          <select
+                            name="resultadoSegundaPruebaConfirmatoria"
+                            value={datos.resultadoSegundaPruebaConfirmatoria}
+                            onChange={manejarCambio}
+                            className={campoSeleccion}
+                          >
+                            <option value="">Seleccione una opción</option>
+                            <option value="NEGATIVO">NEGATIVO</option>
+                            <option value="POSITIVO">POSITIVO</option>
+                          </select>
                         </div>
-                        <input
-                          key={imagenInputKey}
-                          type="file"
-                          accept="image/*"
-                          onChange={manejarCargaImagen}
-                          className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-xl file:border file:border-slate-200 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
-                        />
+
+                        <div>
+                          <label className={etiquetaCampo}>Grado detectado en mg / 100ml {marcaObligatorio}</label>
+                          <input
+                            name="gradoDetectadoSegundaPrueba"
+                            value={datos.gradoDetectadoSegundaPrueba}
+                            onChange={manejarCambio}
+                            inputMode="decimal"
+                            placeholder="Solo numeros decimales"
+                            className={campoTexto}
+                          />
+                        </div>
+                      </>
+                    ) : null}
+
+                    {datos.resultadoSegundaPruebaConfirmatoria === "POSITIVO" ? (
+                      <div className="md:col-span-2" data-required-id="imagenEvidencia" tabIndex={-1}>
+                        <label className={etiquetaCampo}>Imagen evidencia {marcaObligatorio}</label>
+                        <div className="mt-3 flex flex-col gap-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center">
+                          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-900">
+                            <Upload className="size-5" aria-hidden="true" />
+                          </div>
+                          <input
+                            key={imagenInputKey}
+                            type="file"
+                            accept="image/*"
+                            onChange={manejarCargaImagen}
+                            className="block w-full text-sm text-slate-900 file:mr-4 file:rounded-xl file:border file:border-slate-200 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                          />
+                        </div>
+                        {datos.imagenEvidenciaNombre ? (
+                          <p className="mt-2 text-xs font-semibold text-slate-600">{datos.imagenEvidenciaNombre}</p>
+                        ) : null}
                       </div>
-                      {datos.imagenEvidenciaNombre ? (
-                        <p className="mt-2 text-xs font-semibold text-slate-600">{datos.imagenEvidenciaNombre}</p>
-                      ) : null}
-                    </div>
+                    ) : null}
+
                   </>
                 ) : null}
 
@@ -735,19 +835,24 @@ export default function VerificacionAlcoholDrogasForm() {
                       </div>
                       <div className="rounded-xl bg-white p-3">
                         <p className="text-[11px] font-bold uppercase text-slate-500">Resultado segunda prueba confirmatoria</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-950">-</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">{registro.resultadoSegundaPruebaConfirmatoria || "-"}</p>
+                        {registro.gradoDetectadoSegundaPrueba ? (
+                          <p className="text-[11px] text-slate-600">{registro.gradoDetectadoSegundaPrueba} mg / 100ml</p>
+                        ) : null}
+                      </div>
+                      <div className="rounded-xl bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase text-slate-500">Imagen evidencia</p>
+                        {registro.imagenEvidenciaUrl ? (
+                          <div className="mt-2 flex h-24 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-50">
+                            <img src={registro.imagenEvidenciaUrl} alt={registro.imagenEvidenciaNombre || "Imagen evidencia"} className="h-full w-full object-contain" />
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-sm font-semibold text-slate-950">-</p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-[11px] font-bold uppercase text-slate-500">Imagen</p>
-                        {registro.imagenEvidenciaUrl ? (
-                          <img src={registro.imagenEvidenciaUrl} alt="Imagen evidencia" className="mt-2 h-24 w-full object-contain" />
-                        ) : (
-                          <p className="mt-1 text-sm text-slate-600">Sin Imagen</p>
-                        )}
-                      </div>
+                    <div className="mt-4">
                       <div className="rounded-xl border border-slate-200 bg-white p-3">
                         <p className="text-[11px] font-bold uppercase text-slate-500">Firma</p>
                         {registro.firmaPersonaEvaluada ? (
@@ -770,7 +875,7 @@ export default function VerificacionAlcoholDrogasForm() {
                     <col className="w-[17%]" />
                     <col className="w-[12%]" />
                     <col className="w-[14%]" />
-                    <col className="w-[15%]" />
+                    <col className="w-[14%]" />
                     <col className="w-[13%]" />
                     <col className="w-[13%]" />
                     <col className="w-[10%]" />
@@ -786,7 +891,7 @@ export default function VerificacionAlcoholDrogasForm() {
                       <th className="px-3 py-3 italic">Cargo</th>
                       <th className="px-3 py-3 italic">Resultado primera prueba inicial</th>
                       <th className="px-3 py-3 italic">Resultado segunda prueba confirmatoria</th>
-                      <th className="px-3 py-3 italic">Imagen</th>
+                      <th className="px-3 py-3 italic">Imagen evidencia</th>
                       <th className="px-3 py-3 italic">Firma</th>
                       <th className="px-3 py-3 italic">Acción</th>
                     </tr>
@@ -803,12 +908,19 @@ export default function VerificacionAlcoholDrogasForm() {
                           <div>{registro.resultadoPrimeraPruebaInicial}</div>
                           <div className="text-[11px] text-slate-600">{registro.gradoDetectado} mg / 100ml</div>
                         </td>
-                        <td className="border border-slate-300 px-3 py-3">-</td>
-                        <td className="border border-slate-300 px-3 py-2">
+                        <td className="border border-slate-300 px-3 py-3">
+                          <div>{registro.resultadoSegundaPruebaConfirmatoria || "-"}</div>
+                          {registro.gradoDetectadoSegundaPrueba ? (
+                            <div className="text-[11px] text-slate-600">{registro.gradoDetectadoSegundaPrueba} mg / 100ml</div>
+                          ) : null}
+                        </td>
+                        <td className="border border-slate-300 p-0">
                           {registro.imagenEvidenciaUrl ? (
-                            <img src={registro.imagenEvidenciaUrl} alt="Imagen evidencia" className="mx-auto h-14 w-full object-contain" />
+                            <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
+                              <img src={registro.imagenEvidenciaUrl} alt={registro.imagenEvidenciaNombre || "Imagen evidencia"} className="h-full w-full object-contain" />
+                            </div>
                           ) : (
-                            "Sin Imagen"
+                            "-"
                           )}
                         </td>
                         <td className="border border-slate-300 p-0">
