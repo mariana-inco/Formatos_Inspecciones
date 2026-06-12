@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const runtime = "nodejs";
@@ -10,6 +10,42 @@ const crearNombreArchivo = () => {
   const fecha = new Date().toISOString().replace(/[:.]/g, "-");
   return `respuesta-hse-f002-${fecha}.json`;
 };
+
+export async function GET() {
+  try {
+    await mkdir(respuestasDir, { recursive: true });
+    const archivos = await readdir(respuestasDir);
+    const registros = await Promise.all(
+      archivos
+        .filter((archivo) => archivo.endsWith(".json"))
+        .map(async (fileName) => {
+          const contenido = await readFile(path.join(respuestasDir, fileName), "utf8");
+          return {
+            fileName,
+            ...JSON.parse(contenido),
+          };
+        })
+    );
+
+    registros.sort((a, b) => String(b.registro?.fechaRegistro || "").localeCompare(String(a.registro?.fechaRegistro || "")));
+
+    return Response.json({
+      ok: true,
+      registros,
+    });
+  } catch (error) {
+    console.error("Error consultando respuestas en JSON:", error);
+
+    return Response.json(
+      {
+        ok: false,
+        registros: [],
+        message: "No se pudieron consultar las respuestas guardadas.",
+      },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: Request) {
   try {

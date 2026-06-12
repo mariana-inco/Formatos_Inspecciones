@@ -1,11 +1,25 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
-import { ClipboardList, FireExtinguisher, PenLine, UserCog } from "lucide-react";
-import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
+import {
+  CalendarDays,
+  Check,
+  ClipboardList,
+  Clock3,
+  Eye,
+  FilePlus2,
+  FireExtinguisher,
+  Grid2X2,
+  PenLine,
+  Search,
+  TriangleAlert,
+  UserCog,
+  XCircle,
+} from "lucide-react";
+import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F003",
@@ -13,6 +27,13 @@ const METADATOS_FORMATO = {
   version: "05",
   area: "GESTIÓN HSE",
   titulo: "INSPECCIÓN Y VERIFICACIÓN DE EXTINTORES",
+};
+
+const perfilRocaActual = {
+  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
+  cargo: "DESARROLLADOR JUNIOR",
+  proceso: "GESTION DE TECNOLOGIA",
+  compania: "INCOMINERIA S.A.S.",
 };
 
 type EstadoRevision = "" | "BUENO" | "REGULAR" | "MALO" | "NO APLICA";
@@ -49,6 +70,64 @@ type RegistroExtintor = {
   manija: EstadoRevision;
   corrosion: EstadoRevision;
   observaciones: string;
+};
+
+type VerificacionExtintorGuardada = {
+  key: string;
+  criterio: string;
+  estadoId: number | null;
+};
+
+type ExtintorGuardado = {
+  numeroRegistro?: number;
+  identificacionExtintor?: {
+    numeroExtintor?: string;
+    capacidad?: string;
+    agente?: string;
+    clase?: string;
+    ubicacion?: string;
+    fechaUltimaRecarga?: string;
+    fechaProximaRecarga?: string;
+  };
+  verificacion?: VerificacionExtintorGuardada[];
+  observaciones?: string;
+};
+
+type RegistroExtintoresGuardado = {
+  fileName?: string;
+  registro?: {
+    fechaRegistro?: string;
+    usuarioEmail?: string;
+  };
+  datosInspeccion?: {
+    sedeCentroTrabajo?: string;
+    responsableInspeccion?: string;
+    cargoResponsable?: string;
+    equipoInterno?: string;
+    equipoExterno?: string;
+  };
+  registros?: ExtintorGuardado[];
+};
+
+type EstadoFiltroRegistros = "todos" | "bueno" | "regular" | "malo" | "recarga-vencida" | "proximo-recarga";
+
+type FilaRegistrosExtintor = {
+  id: string;
+  codigo: string;
+  archivo: string;
+  fecha: string;
+  sede: string;
+  responsable: string;
+  numeroExtintor: string;
+  ubicacion: string;
+  capacidad: string;
+  agente: string;
+  clase: string;
+  estado: "Bueno" | "Regular" | "Malo";
+  estadoRecarga: "Vigente" | "Recarga vencida" | "Próximo a recarga";
+  proximaRecarga: string;
+  registroPadre: RegistroExtintoresGuardado;
+  extintor: ExtintorGuardado;
 };
 
 const datosInspeccionIniciales: DatosInspeccion = {
@@ -135,6 +214,11 @@ const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const mostrarValor = (value: string) => value || "N/A";
 const mostrarEstado = (value: EstadoRevision) => (value === "NO APLICA" || !value ? "N/A" : value);
+const normalizarBusqueda = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 const enfocarCampoFaltante = (id: string) => {
   const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
   campo?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -147,12 +231,50 @@ const claseEstadoComponente = (value: EstadoRevision) => {
   return "bg-slate-200 text-slate-700";
 };
 const etiquetaEstadoRevision = (value: EstadoRevision) => (value === "NO APLICA" ? "N/A" : value);
+const opcionesRevisionVisibles = (estadoSeleccionado: EstadoRevision) =>
+  estadoSeleccionado ? [estadoSeleccionado] : opcionesRevision;
+const etiquetaRevisionId = (estadoId?: number | null) => {
+  if (estadoId === 1) return "Bueno";
+  if (estadoId === 2) return "Regular";
+  if (estadoId === 3) return "Malo";
+  return "N/A";
+};
+const obtenerEstadoExtintor = (verificacion: VerificacionExtintorGuardada[] = []): "Bueno" | "Regular" | "Malo" => {
+  if (verificacion.some((item) => item.estadoId === 3)) return "Malo";
+  if (verificacion.some((item) => item.estadoId === 2)) return "Regular";
+  return "Bueno";
+};
+const obtenerEstadoRecarga = (fechaProximaRecarga?: string): "Vigente" | "Recarga vencida" | "Próximo a recarga" => {
+  if (!fechaProximaRecarga) return "Vigente";
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const fecha = new Date(`${fechaProximaRecarga}T00:00:00`);
+  if (Number.isNaN(fecha.getTime())) return "Vigente";
+  const diasRestantes = Math.ceil((fecha.getTime() - hoy.getTime()) / 86400000);
+  if (diasRestantes < 0) return "Recarga vencida";
+  if (diasRestantes <= 30) return "Próximo a recarga";
+  return "Vigente";
+};
+const obtenerConteoRegistros = (filas: FilaRegistrosExtintor[], campo: "sede" | "ubicacion") =>
+  Object.entries(
+    filas.reduce<Record<string, number>>((acc, fila) => {
+      const label = fila[campo] || "Sin dato";
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {})
+  ).map(([label, value]) => ({ label, value }));
+const claseEstadoRegistros = (estado: string) => {
+  if (estado === "Bueno" || estado === "Vigente") return "bg-emerald-100 text-emerald-800";
+  if (estado === "Regular" || estado === "Próximo a recarga") return "bg-amber-100 text-amber-800";
+  if (estado === "Malo" || estado === "Recarga vencida") return "bg-red-100 text-red-800";
+  return "bg-slate-100 text-slate-700";
+};
 const claseBotonRevision = (value: EstadoRevision, seleccionado: boolean) => {
   if (!seleccionado) return "border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50";
   if (value === "BUENO") return "border border-emerald-300 bg-emerald-100 text-emerald-800 shadow-sm";
   if (value === "REGULAR") return "border border-amber-300 bg-amber-100 text-amber-800 shadow-sm";
   if (value === "MALO") return "border border-red-300 bg-red-100 text-red-800 shadow-sm";
-  return "border border-slate-300 bg-slate-100 text-slate-700 shadow-sm";
+  return "border border-slate-700 bg-slate-700 text-white shadow-sm ring-2 ring-slate-400";
 };
 
 const serializarFirma = (svg: SVGSVGElement) => {
@@ -176,7 +298,97 @@ export default function InspeccionExtintoresForm() {
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
+  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
+  const [registrosRegistros, setRegistrosRegistros] = useState<RegistroExtintoresGuardado[]>([]);
+  const [cargandoRegistros, setCargandoRegistros] = useState(false);
+  const [busquedaRegistros, setBusquedaRegistros] = useState("");
+  const [filtroEstadoRegistros, setFiltroEstadoRegistros] = useState<EstadoFiltroRegistros>("todos");
+  const [filaSeleccionadaRegistros, setFilaSeleccionadaRegistros] = useState<FilaRegistrosExtintor | null>(null);
   const referenciaFirma = useRef<SignatureRef>(null);
+
+  const cargarRegistrosRegistros = async () => {
+    setCargandoRegistros(true);
+    try {
+      const respuesta = await fetch("/api/formatos/inspeccion-extintores/respuestas", { cache: "no-store" });
+      if (!respuesta.ok) throw new Error("No se pudieron consultar las respuestas.");
+      const datos = (await respuesta.json()) as { registros?: RegistroExtintoresGuardado[] };
+      setRegistrosRegistros(datos.registros || []);
+    } catch (error) {
+      console.error("Error cargando Registros de extintores:", error);
+      setRegistrosRegistros([]);
+    } finally {
+      setCargandoRegistros(false);
+    }
+  };
+
+  const filasRegistros = useMemo<FilaRegistrosExtintor[]>(() => {
+    return registrosRegistros.flatMap((registroGuardado) =>
+      (registroGuardado.registros || []).map((extintor, index) => {
+        const identificacion = extintor.identificacionExtintor || {};
+        const estado = obtenerEstadoExtintor(extintor.verificacion || []);
+        const proximaRecarga = identificacion.fechaProximaRecarga || "";
+        return {
+          id: `${registroGuardado.fileName || "registro"}-${extintor.numeroRegistro || index + 1}`,
+          codigo: METADATOS_FORMATO.codigo,
+          archivo: registroGuardado.fileName || "-",
+          fecha: registroGuardado.registro?.fechaRegistro?.slice(0, 10) || "-",
+          sede: registroGuardado.datosInspeccion?.sedeCentroTrabajo || "-",
+          responsable: registroGuardado.datosInspeccion?.responsableInspeccion || "-",
+          numeroExtintor: identificacion.numeroExtintor || "-",
+          ubicacion: identificacion.ubicacion || "-",
+          capacidad: identificacion.capacidad || "-",
+          agente: identificacion.agente || "-",
+          clase: identificacion.clase || "-",
+          estado,
+          estadoRecarga: obtenerEstadoRecarga(proximaRecarga),
+          proximaRecarga: proximaRecarga || "-",
+          registroPadre: registroGuardado,
+          extintor,
+        };
+      })
+    );
+  }, [registrosRegistros]);
+
+  const filasFiltradasRegistros = useMemo(() => {
+    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
+    return filasRegistros.filter((fila) => {
+      const textoBusqueda = normalizarBusqueda(
+        [
+          fila.responsable,
+          fila.sede,
+          fila.numeroExtintor,
+          fila.ubicacion,
+          fila.capacidad,
+          fila.agente,
+          fila.clase,
+          fila.archivo,
+        ].join(" ")
+      );
+      const coincideBusqueda = !busqueda || textoBusqueda.includes(busqueda);
+      const coincideEstado =
+        filtroEstadoRegistros === "todos" ||
+        (filtroEstadoRegistros === "bueno" && fila.estado === "Bueno") ||
+        (filtroEstadoRegistros === "regular" && fila.estado === "Regular") ||
+        (filtroEstadoRegistros === "malo" && fila.estado === "Malo") ||
+        (filtroEstadoRegistros === "recarga-vencida" && fila.estadoRecarga === "Recarga vencida") ||
+        (filtroEstadoRegistros === "proximo-recarga" && fila.estadoRecarga === "Próximo a recarga");
+      return coincideBusqueda && coincideEstado;
+    });
+  }, [busquedaRegistros, filasRegistros, filtroEstadoRegistros]);
+
+  const resumenRegistros = useMemo(
+    () => ({
+      total: filasFiltradasRegistros.length,
+      buenos: filasFiltradasRegistros.filter((fila) => fila.estado === "Bueno").length,
+      regulares: filasFiltradasRegistros.filter((fila) => fila.estado === "Regular").length,
+      malos: filasFiltradasRegistros.filter((fila) => fila.estado === "Malo").length,
+      recargaVencida: filasFiltradasRegistros.filter((fila) => fila.estadoRecarga === "Recarga vencida").length,
+      proximaRecarga: filasFiltradasRegistros.filter((fila) => fila.estadoRecarga === "Próximo a recarga").length,
+    }),
+    [filasFiltradasRegistros]
+  );
+  const inspeccionesPorSedeRegistros = useMemo(() => obtenerConteoRegistros(filasFiltradasRegistros, "sede"), [filasFiltradasRegistros]);
+  const extintoresPorUbicacionRegistros = useMemo(() => obtenerConteoRegistros(filasFiltradasRegistros, "ubicacion"), [filasFiltradasRegistros]);
 
   const manejarCambioDatosInspeccion = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -193,7 +405,7 @@ export default function InspeccionExtintoresForm() {
   };
 
   const manejarEstadoRevision = (campo: keyof RegistroExtintor, estado: EstadoRevision) => {
-    setRegistro((prev) => ({ ...prev, [campo]: estado }));
+    setRegistro((prev) => ({ ...prev, [campo]: prev[campo] === estado ? "" : estado }));
   };
 
   const limpiarFirma = () => {
@@ -277,18 +489,19 @@ export default function InspeccionExtintoresForm() {
       version: METADATOS_FORMATO.version,
       area: METADATOS_FORMATO.area,
     },
-    fechaRegistro: new Date().toISOString(),
+    registro: {
+      fechaRegistro: new Date().toISOString(),
+      usuarioEmail: datosInspeccion.email,
+    },
     datosInspeccion: {
-      email: datosInspeccion.email,
       sedeCentroTrabajo: datosInspeccion.sedeCentroTrabajo,
       responsableInspeccion: datosInspeccion.responsableInspeccion,
       cargoResponsable: datosInspeccion.cargoResponsable,
       equipoInterno: datosInspeccion.equipoInterno,
       equipoExterno: datosInspeccion.equipoExterno,
-      firma: {
-        registrada: datosInspeccion.firmaRegistrada,
-        dataUrl: datosInspeccion.firmaResponsable,
-      },
+    },
+    firmas: {
+      firmaResponsable: limpiarFirmaParaJson(datosInspeccion.firmaResponsable, "firma-responsable-extintores"),
     },
     totalRegistros: registros.length,
     registros: registros.map((item, index) => ({
@@ -305,7 +518,7 @@ export default function InspeccionExtintoresForm() {
       verificacion: camposRevision.map((campo) => ({
         key: campo.key,
         criterio: campo.label,
-        estado: item[campo.key],
+        estadoId: mapRevisionToId(String(item[campo.key] || "")),
       })),
       observaciones: item.observaciones,
     })),
@@ -325,8 +538,7 @@ export default function InspeccionExtintoresForm() {
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F003?")) return;
     const respuestaJson = construirRespuestaJson();
-    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
-    console.log("JSON del formulario HSE-F003:", respuestaJsonFormateada);
+    registrarJsonFinalFormulario(respuestaJson);
 
     try {
       const respuestaHttp = await fetch("/api/formatos/inspeccion-extintores/respuestas", {
@@ -337,70 +549,70 @@ export default function InspeccionExtintoresForm() {
 
       if (!respuestaHttp.ok) throw new Error("No se pudo guardar la respuesta en JSON.");
 
-      const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
-      console.log("Respuesta guardada en JSON:", resultadoGuardado);
-      console.log("Registro completo del formulario:", respuestaJson);
-      localStorage.removeItem("borrador-inspeccion-extintores");
+      await respuestaHttp.json();
+      setDatosInspeccion(datosInspeccionIniciales);
+      setRegistro(registroInicial);
+      setRegistros([]);
+      setIndiceEdicion(null);
+      referenciaFirma.current?.clear();
+      setFirmaTieneTrazo(false);
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
-  const estadoProteccion = { datosInspeccion, registro, registros, indiceEdicion };
-  const estadoInicialProteccion = {
-    datosInspeccion: datosInspeccionIniciales,
-    registro: registroInicial,
-    registros: [] as RegistroExtintor[],
-    indiceEdicion: null as number | null,
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
-      <ProteccionDatosFormulario
-        storageKey="borrador-inspeccion-extintores"
-        datos={estadoProteccion}
-        datosIniciales={estadoInicialProteccion}
-        onRestaurar={(borrador) => {
-          setDatosInspeccion(borrador.datosInspeccion);
-          setRegistro(borrador.registro);
-          setRegistros(borrador.registros);
-          setIndiceEdicion(borrador.indiceEdicion);
-          setFirmaTieneTrazo(false);
-          referenciaFirma.current?.clear();
-        }}
-        onDescartar={() => {
-          setDatosInspeccion(datosInspeccionIniciales);
-          setRegistro(registroInicial);
-          setRegistros([]);
-          setIndiceEdicion(null);
-          setFirmaTieneTrazo(false);
-          referenciaFirma.current?.clear();
-        }}
-      />
       <div className="w-full max-w-full">
-        <div className="mb-6 overflow-x-auto bg-white">
-          <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
-            <div className="min-h-[112px] border-r border-slate-400 bg-white" aria-label="Espacio reservado para el logo" />
-            <div className="border-r border-slate-400">
-              <div className="border-b border-slate-400 py-1 text-center font-bold uppercase">{METADATOS_FORMATO.area}</div>
-              <div className="flex min-h-[88px] items-start justify-center px-4 pt-3 text-center font-bold uppercase">
-                {METADATOS_FORMATO.titulo}
+        <header className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
+          <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
+            <div>
+              <div className="flex gap-3 sm:items-start">
+              <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:size-14">
+                <FireExtinguisher className="size-7 sm:size-8" aria-hidden="true" />
               </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-start gap-2">
+                  <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-2xl">Inspección y verificación de extintores</h1>
+                  <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-bold text-white">{METADATOS_FORMATO.codigo}</span>
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Integrado en ROCA con ejecutantes firmantes y responsables de aprobación.
+                </p>
+              </div>
+              </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ["Compañía", perfilRocaActual.compania],
+                    ["Versión", METADATOS_FORMATO.version],
+                    ["Estado", "En diligenciamiento"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                      <p className="mt-2 text-sm font-bold uppercase text-slate-950">{value}</p>
+                    </div>
+                  ))}
+                </div>
             </div>
-            <div className="grid grid-rows-[24px_1fr_24px]">
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Codigo:</span> {METADATOS_FORMATO.codigo}
-              </div>
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Fecha:</span> {METADATOS_FORMATO.fecha}
-              </div>
-              <div className="px-2 py-1">
-                <span className="font-bold italic">Version:</span> {METADATOS_FORMATO.version}
+
+            <div className="rounded-2xl border border-slate-200 bg-white/75 p-3 shadow-sm sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              {[
+                ["Solicitante", perfilRocaActual.nombre],
+                ["Cargo", perfilRocaActual.cargo],
+                ["Proceso", perfilRocaActual.proceso],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{value}</p>
+                </div>
+              ))}
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
         <div className="border-t-2 border-blue-500 pt-8">
           <div className="space-y-7">
@@ -514,7 +726,7 @@ export default function InspeccionExtintoresForm() {
                             {campo.label} {marcaObligatorio}
                           </p>
                           <div data-required-id={String(campo.key)} className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 lg:w-fit" tabIndex={-1}>
-                            {opcionesRevision.map((opcion) => {
+                            {opcionesRevisionVisibles((registro[campo.key] as EstadoRevision) || "").map((opcion) => {
                               const seleccionado = registro[campo.key] === opcion;
                               return (
                                 <button
@@ -695,3 +907,6 @@ export default function InspeccionExtintoresForm() {
     </div>
   );
 }
+
+
+

@@ -1,9 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-import { ClipboardCheck, ClipboardList, FileText, Settings, UserCog } from "lucide-react";
-import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
+import {
+  BarChart3,
+  Check,
+  ClipboardCheck,
+  ClipboardList,
+  Eye,
+  FilePlus2,
+  FileText,
+  Grid2X2,
+  HardHat,
+  Minus,
+  Search,
+  Settings,
+  UserCog,
+  XCircle,
+} from "lucide-react";
+import { mapEstadoToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 import { FORM_META, opcionesCantidadOtros, opcionesEstado, seccionesChequeo } from "./data";
 import type { EstadoChequeo } from "./data";
 
@@ -30,6 +45,75 @@ type OtroDetalle = {
   cual: string;
   estado: EstadoChequeo;
   observaciones: string;
+};
+
+type ItemInspeccionGuardado = {
+  key: string;
+  criterio: string;
+  estadoId: number | null;
+  observaciones: string;
+};
+
+type GrupoInspeccionGuardado = {
+  grupoId: number;
+  grupoTitulo: string;
+  items: ItemInspeccionGuardado[];
+};
+
+type OtroGuardado = {
+  numeroRegistro: number;
+  cual: string;
+  estadoId: number | null;
+  observaciones: string;
+};
+
+type RegistroCondicionesGuardado = {
+  fileName?: string;
+  registro?: {
+    fechaRegistro?: string;
+    usuarioEmail?: string;
+  };
+  datosGenerales?: {
+    inspector?: string;
+    areaInspeccionada?: string;
+    fecha?: string;
+    maquinariaHerramientas?: string;
+    numeroTrabajadoresArea?: number;
+    puestosTrabajo?: number;
+    sustanciasUtilizadas?: string;
+  };
+  itemsInspeccion?: GrupoInspeccionGuardado[];
+  otros?: {
+    cantidad?: string;
+    detalle?: OtroGuardado[];
+  };
+  observacionesGenerales?: string;
+  recomendaciones?: string;
+};
+
+type FiltroRegistros = "todos" | "cumple" | "no-cumple" | "na" | "hallazgos";
+
+type FilaRegistrosCondiciones = {
+  id: string;
+  codigo: string;
+  fecha: string;
+  inspector: string;
+  areaInspeccionada: string;
+  cumplen: number;
+  noCumplen: number;
+  noAplica: number;
+  totalItems: number;
+  porcentajeCumplimiento: number;
+  estado: "Cumple" | "Con hallazgos" | "Sin evaluar";
+  archivo: string;
+  registro: RegistroCondicionesGuardado;
+};
+
+const perfilRocaActual = {
+  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
+  cargo: "DESARROLLADOR JUNIOR",
+  proceso: "GESTION DE TECNOLOGIA",
+  compania: "INCOMINERIA S.A.S.",
 };
 
 const datosGeneralesIniciales: DatosGenerales = {
@@ -69,12 +153,19 @@ const claseBotonEstado = (opcion: EstadoChequeo, seleccionado: boolean) => {
       : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:bg-slate-50";
   }
   return seleccionado
-    ? "border-slate-400 bg-slate-200 text-slate-800 ring-2 ring-slate-200"
+    ? "border-slate-700 bg-slate-700 text-white ring-2 ring-slate-400"
     : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:bg-slate-50";
 };
+const opcionesEstadoVisibles = (estadoSeleccionado: EstadoChequeo) =>
+  estadoSeleccionado ? [estadoSeleccionado] : opcionesEstado;
 
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
+const normalizarBusqueda = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 const enfocarCampoFaltante = (id: string) => {
   const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
   campo?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -95,11 +186,149 @@ const crearDetalleOtros = (cantidad: number, detalleActual: OtroDetalle[] = []) 
     { length: cantidad },
     (_, index) => detalleActual[index] ?? { cual: "", estado: "", observaciones: "" }
   );
+const etiquetaEstadoId = (estadoId?: number | null) => {
+  if (estadoId === 1) return "Cumple";
+  if (estadoId === 2) return "No cumple";
+  if (estadoId === 3) return "N.A";
+  return "Sin evaluar";
+};
+const claseEstadoRegistros = (estado: string) => {
+  if (estado === "Cumple") return "bg-emerald-100 text-emerald-800";
+  if (estado === "No cumple" || estado === "Con hallazgos") return "bg-red-100 text-red-800";
+  if (estado === "N.A") return "bg-slate-200 text-slate-800";
+  return "bg-slate-100 text-slate-700";
+};
+const obtenerItemsRegistro = (registro: RegistroCondicionesGuardado) => [
+  ...(registro.itemsInspeccion || []).flatMap((grupo) => grupo.items.map((item) => ({ ...item, grupoTitulo: grupo.grupoTitulo }))),
+  ...(registro.otros?.detalle || []).map((otro) => ({
+    key: `otro-${otro.numeroRegistro}`,
+    criterio: otro.cual || `Otro ${otro.numeroRegistro}`,
+    estadoId: otro.estadoId,
+    observaciones: otro.observaciones,
+    grupoTitulo: "10. Otros",
+  })),
+];
+const contarPorCampo = <T extends { label: string }>(items: T[]) =>
+  Object.entries(
+    items.reduce<Record<string, number>>((acc, item) => {
+      acc[item.label] = (acc[item.label] || 0) + 1;
+      return acc;
+    }, {})
+  ).map(([label, value]) => ({ label, value }));
 
 export default function ListaChequeoCondicionesSeguridadForm() {
   const [datosGenerales, setDatosGenerales] = useState<DatosGenerales>(datosGeneralesIniciales);
   const [respuestas, setRespuestas] = useState<Record<string, RespuestaItem>>(crearRespuestasIniciales);
   const [otrosDetalle, setOtrosDetalle] = useState<OtroDetalle[]>([]);
+  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
+  const [registrosRegistros, setRegistrosRegistros] = useState<RegistroCondicionesGuardado[]>([]);
+  const [cargandoRegistros, setCargandoRegistros] = useState(false);
+  const [busquedaRegistros, setBusquedaRegistros] = useState("");
+  const [filtroRegistros, setFiltroRegistros] = useState<FiltroRegistros>("todos");
+  const [filaSeleccionadaRegistros, setFilaSeleccionadaRegistros] = useState<FilaRegistrosCondiciones | null>(null);
+
+  const cargarRegistrosRegistros = async () => {
+    setCargandoRegistros(true);
+    try {
+      const respuesta = await fetch("/api/formatos/lista-chequeo-condiciones-seguridad/respuestas", { cache: "no-store" });
+      if (!respuesta.ok) throw new Error("No se pudieron consultar las respuestas.");
+      const datos = (await respuesta.json()) as { registros?: RegistroCondicionesGuardado[] };
+      setRegistrosRegistros(datos.registros || []);
+    } catch (error) {
+      console.error("Error cargando Registros de condiciones de seguridad:", error);
+      setRegistrosRegistros([]);
+    } finally {
+      setCargandoRegistros(false);
+    }
+  };
+
+  const filasRegistros = useMemo<FilaRegistrosCondiciones[]>(() => {
+    return registrosRegistros.map((registro, index) => {
+      const items = obtenerItemsRegistro(registro);
+      const cumplen = items.filter((item) => item.estadoId === 1).length;
+      const noCumplen = items.filter((item) => item.estadoId === 2).length;
+      const noAplica = items.filter((item) => item.estadoId === 3).length;
+      const totalItems = items.length;
+      return {
+        id: registro.fileName || `registro-${index}`,
+        codigo: FORM_META.codigo,
+        fecha: registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || "-",
+        inspector: registro.datosGenerales?.inspector || "-",
+        areaInspeccionada: registro.datosGenerales?.areaInspeccionada || "-",
+        cumplen,
+        noCumplen,
+        noAplica,
+        totalItems,
+        porcentajeCumplimiento: totalItems > 0 ? Math.round((cumplen / totalItems) * 100) : 0,
+        estado: totalItems === 0 ? "Sin evaluar" : noCumplen > 0 ? "Con hallazgos" : "Cumple",
+        archivo: registro.fileName || "-",
+        registro,
+      };
+    });
+  }, [registrosRegistros]);
+
+  const filasFiltradasRegistros = useMemo(() => {
+    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
+    return filasRegistros.filter((fila) => {
+      const items = obtenerItemsRegistro(fila.registro);
+      const textoBusqueda = normalizarBusqueda(
+        [
+          fila.inspector,
+          fila.areaInspeccionada,
+          fila.archivo,
+          fila.registro.observacionesGenerales,
+          fila.registro.recomendaciones,
+          ...items.flatMap((item) => [item.criterio, item.observaciones]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      const coincideBusqueda = !busqueda || textoBusqueda.includes(busqueda);
+      const coincideFiltro =
+        filtroRegistros === "todos" ||
+        (filtroRegistros === "cumple" && fila.cumplen > 0) ||
+        (filtroRegistros === "no-cumple" && fila.noCumplen > 0) ||
+        (filtroRegistros === "na" && fila.noAplica > 0) ||
+        (filtroRegistros === "hallazgos" && fila.noCumplen > 0);
+      return coincideBusqueda && coincideFiltro;
+    });
+  }, [busquedaRegistros, filasRegistros, filtroRegistros]);
+
+  const resumenRegistros = useMemo(() => {
+    const totalItems = filasFiltradasRegistros.reduce((acc, fila) => acc + fila.totalItems, 0);
+    const cumplen = filasFiltradasRegistros.reduce((acc, fila) => acc + fila.cumplen, 0);
+    const noCumplen = filasFiltradasRegistros.reduce((acc, fila) => acc + fila.noCumplen, 0);
+    const noAplica = filasFiltradasRegistros.reduce((acc, fila) => acc + fila.noAplica, 0);
+    return {
+      totalInspecciones: filasFiltradasRegistros.length,
+      totalItems,
+      cumplen,
+      noCumplen,
+      noAplica,
+      porcentajeCumplimiento: totalItems > 0 ? Math.round((cumplen / totalItems) * 100) : 0,
+    };
+  }, [filasFiltradasRegistros]);
+
+  const inspeccionesPorAreaRegistros = useMemo(
+    () => contarPorCampo(filasFiltradasRegistros.map((fila) => ({ label: fila.areaInspeccionada || "Sin área" }))),
+    [filasFiltradasRegistros]
+  );
+  const categoriasConMasNoCumplimientos = useMemo(() => {
+    const itemsNoCumplen = filasFiltradasRegistros.flatMap((fila) =>
+      obtenerItemsRegistro(fila.registro)
+        .filter((item) => item.estadoId === 2)
+        .map((item) => ({ label: item.grupoTitulo || "Sin categoría" }))
+    );
+    return contarPorCampo(itemsNoCumplen).sort((a, b) => b.value - a.value).slice(0, 6);
+  }, [filasFiltradasRegistros]);
+  const itemsConMasNoCumplimientos = useMemo(() => {
+    const itemsNoCumplen = filasFiltradasRegistros.flatMap((fila) =>
+      obtenerItemsRegistro(fila.registro)
+        .filter((item) => item.estadoId === 2)
+        .map((item) => ({ label: item.criterio || "Sin ítem" }))
+    );
+    return contarPorCampo(itemsNoCumplen).sort((a, b) => b.value - a.value).slice(0, 6);
+  }, [filasFiltradasRegistros]);
 
   const manejarCambioDatos = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -119,7 +348,14 @@ export default function ListaChequeoCondicionesSeguridadForm() {
   };
 
   const manejarEstadoItem = (key: string, estado: EstadoChequeo) => {
-    setRespuestas((prev) => ({ ...prev, [key]: { ...prev[key], estado } }));
+    setRespuestas((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        estado: prev[key]?.estado === estado ? "" : estado,
+        observaciones: estado === "Cumple" && prev[key]?.estado !== estado ? "" : prev[key]?.observaciones || "",
+      },
+    }));
   };
 
   const manejarObservacionItem = (key: string, observaciones: string) => {
@@ -129,7 +365,13 @@ export default function ListaChequeoCondicionesSeguridadForm() {
   const manejarCambioOtro = (index: number, campo: keyof OtroDetalle, value: string) => {
     setOtrosDetalle((prev) =>
       prev.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [campo]: value } : item
+        itemIndex === index
+          ? {
+              ...item,
+              [campo]: campo === "estado" && item.estado === value ? "" : value,
+              observaciones: campo === "estado" && value === "Cumple" && item.estado !== value ? "" : item.observaciones,
+            }
+          : item
       )
     );
   };
@@ -165,23 +407,26 @@ export default function ListaChequeoCondicionesSeguridadForm() {
       version: FORM_META.version,
       area: FORM_META.area,
     },
-    fechaRegistro: new Date().toISOString(),
+    registro: {
+      fechaRegistro: new Date().toISOString(),
+      usuarioEmail: datosGenerales.email,
+    },
     datosGenerales: {
-      email: datosGenerales.email,
       inspector: datosGenerales.inspector,
       areaInspeccionada: datosGenerales.areaInspeccionada,
       fecha: datosGenerales.fecha,
       maquinariaHerramientas: datosGenerales.maquinariaHerramientas,
-      numeroTrabajadoresArea: datosGenerales.numeroTrabajadoresArea,
-      puestosTrabajo: datosGenerales.puestosTrabajo,
+      numeroTrabajadoresArea: Number(datosGenerales.numeroTrabajadoresArea),
+      puestosTrabajo: Number(datosGenerales.puestosTrabajo),
       sustanciasUtilizadas: datosGenerales.sustanciasUtilizadas,
     },
-    itemsInspeccion: seccionesChequeo.map((seccion) => ({
-      titulo: seccion.titulo,
+    itemsInspeccion: seccionesChequeo.map((seccion, index) => ({
+      grupoId: index + 1,
+      grupoTitulo: seccion.titulo,
       items: seccion.items.map((item) => ({
         key: item.key,
         criterio: item.label,
-        estado: respuestas[item.key]?.estado || "",
+        estadoId: mapEstadoToId(respuestas[item.key]?.estado || ""),
         observaciones: respuestas[item.key]?.observaciones || "",
       })),
     })),
@@ -190,7 +435,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
       detalle: otrosDetalle.map((otro, index) => ({
         numeroRegistro: index + 1,
         cual: otro.cual,
-        estado: otro.estado,
+        estadoId: mapEstadoToId(otro.estado),
         observaciones: otro.observaciones,
       })),
     },
@@ -208,8 +453,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F010?")) return;
     const respuestaJson = construirRespuestaJson();
-    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
-    console.log("JSON del formulario HSE-F010:", respuestaJsonFormateada);
+    registrarJsonFinalFormulario(respuestaJson);
 
     try {
       const respuestaHttp = await fetch("/api/formatos/lista-chequeo-condiciones-seguridad/respuestas", {
@@ -220,67 +464,67 @@ export default function ListaChequeoCondicionesSeguridadForm() {
 
       if (!respuestaHttp.ok) throw new Error("No se pudo guardar la respuesta en JSON.");
 
-      const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
-      console.log("Respuesta guardada en JSON:", resultadoGuardado);
-      console.log("Registro completo del formulario:", respuestaJson);
-      localStorage.removeItem("borrador-lista-chequeo-condiciones-seguridad");
+      await respuestaHttp.json();
+      setDatosGenerales(datosGeneralesIniciales);
+      setRespuestas(crearRespuestasIniciales());
+      setOtrosDetalle([]);
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
-  const estadoProteccion = { datosGenerales, respuestas, otrosDetalle };
-  const estadoInicialProteccion = {
-    datosGenerales: datosGeneralesIniciales,
-    respuestas: crearRespuestasIniciales(),
-    otrosDetalle: [] as OtroDetalle[],
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
-      <ProteccionDatosFormulario
-        storageKey="borrador-lista-chequeo-condiciones-seguridad"
-        datos={estadoProteccion}
-        datosIniciales={estadoInicialProteccion}
-        onRestaurar={(borrador) => {
-          setDatosGenerales(borrador.datosGenerales);
-          setRespuestas(borrador.respuestas);
-          setOtrosDetalle(borrador.otrosDetalle);
-        }}
-        onDescartar={() => {
-          setDatosGenerales(datosGeneralesIniciales);
-          setRespuestas(crearRespuestasIniciales());
-          setOtrosDetalle([]);
-        }}
-      />
       <div className="mx-auto w-full max-w-[1500px]">
-        <div className="mb-6 overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-sm">
-          <div className="grid min-w-[860px] grid-cols-[20%_1fr_22%] text-xs text-slate-950">
-            <div className="flex min-h-[112px] items-center justify-center border-r border-slate-400 bg-white px-5" aria-label="Espacio reservado para el logo">
-              <span className="text-2xl font-bold lowercase tracking-tight text-emerald-800">incomineria</span>
+        <header className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
+          <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
+            <div>
+              <div className="flex gap-3 sm:items-start">
+              <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:size-14">
+                <HardHat className="size-7 sm:size-8" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-start gap-2">
+                  <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-2xl">Lista de chequeo de condiciones de seguridad</h1>
+                  <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-bold text-white">{FORM_META.codigo}</span>
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Integrado en ROCA con ejecutantes firmantes y responsables de aprobación.
+                </p>
+              </div>
+              </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ["Compañía", perfilRocaActual.compania],
+                    ["Versión", FORM_META.version],
+                    ["Estado", "En diligenciamiento"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                      <p className="mt-2 text-sm font-bold uppercase text-slate-950">{value}</p>
+                    </div>
+                  ))}
+                </div>
             </div>
 
-            <div className="border-r border-slate-400">
-              <div className="border-b border-slate-400 py-1 text-center font-bold uppercase">{FORM_META.area}</div>
-              <div className="flex min-h-[88px] items-start justify-center px-4 pt-3 text-center font-bold uppercase">
-                {FORM_META.titulo}
-              </div>
-            </div>
-
-            <div className="grid grid-rows-[32px_1fr_32px]">
-              <div className="border-b border-slate-400 px-2 py-2">
-                <span className="font-bold italic">Codigo:</span> {FORM_META.codigo}
-              </div>
-              <div className="border-b border-slate-400 px-2 py-2">
-                <span className="font-bold italic">Fecha:</span> {FORM_META.fecha}
-              </div>
-              <div className="px-2 py-2">
-                <span className="font-bold italic">Version:</span> {FORM_META.version}
+            <div className="rounded-2xl border border-slate-200 bg-white/75 p-3 shadow-sm sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              {[
+                ["Solicitante", perfilRocaActual.nombre],
+                ["Cargo", perfilRocaActual.cargo],
+                ["Proceso", perfilRocaActual.proceso],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{value}</p>
+                </div>
+              ))}
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
         <div className="border-t-2 border-blue-500 pt-6">
           <section className={tarjetaSeccion}>
@@ -355,29 +599,30 @@ export default function ListaChequeoCondicionesSeguridadForm() {
                       <div className="grid gap-4 xl:grid-cols-[minmax(160px,1fr)_auto] xl:items-center">
                         <p className="text-sm font-bold uppercase text-slate-950">{item.label}</p>
                         <div data-required-id={`estado-${item.key}`} className="flex w-full flex-wrap gap-2 rounded-xl bg-slate-50 p-2 text-sm font-semibold text-slate-700 xl:w-auto" tabIndex={-1}>
-                          {opcionesEstado.map((opcion) => (
-                            <label
+                          {opcionesEstadoVisibles(respuestas[item.key]?.estado || "").map((opcion) => (
+                            <button
                               key={`${item.key}-${opcion}`}
+                              type="button"
+                              aria-pressed={respuestas[item.key]?.estado === opcion}
+                              onClick={() => manejarEstadoItem(item.key, opcion)}
                               className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-sm transition sm:text-sm xl:flex-none ${
                                 claseBotonEstado(opcion, respuestas[item.key]?.estado === opcion)
                               }`}
                             >
-                              <input
-                                type="radio"
-                                name={`estado-${item.key}`}
-                                checked={respuestas[item.key]?.estado === opcion}
-                                onChange={() => manejarEstadoItem(item.key, opcion)}
-                                className="sr-only"
-                              />
                               {opcion}
-                            </label>
+                            </button>
                           ))}
                         </div>
                       </div>
 
                       <div className="mt-4 border-t border-slate-200 pt-4">
                         <label className={etiquetaCampo}>Observaciones</label>
-                        <input value={respuestas[item.key]?.observaciones || ""} onChange={(e) => manejarObservacionItem(item.key, e.target.value)} className={campoTexto} />
+                        <input
+                          value={respuestas[item.key]?.observaciones || ""}
+                          onChange={(e) => manejarObservacionItem(item.key, e.target.value)}
+                          disabled={respuestas[item.key]?.estado === "Cumple"}
+                          className={`${campoTexto} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none`}
+                        />
                       </div>
                     </div>
                   ))}
@@ -420,22 +665,18 @@ export default function ListaChequeoCondicionesSeguridadForm() {
                         </div>
 
                         <div data-required-id={`otroEstado-${index}`} className="flex w-full flex-wrap gap-2 rounded-xl bg-slate-50 p-2 text-sm font-semibold text-slate-700 lg:w-auto" tabIndex={-1}>
-                          {opcionesEstado.map((opcion) => (
-                            <label
+                          {opcionesEstadoVisibles(otro.estado).map((opcion) => (
+                            <button
                               key={`otro-${index}-${opcion}`}
+                              type="button"
+                              aria-pressed={otro.estado === opcion}
+                              onClick={() => manejarCambioOtro(index, "estado", opcion)}
                               className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-sm transition sm:text-sm lg:flex-none ${
                                 claseBotonEstado(opcion, otro.estado === opcion)
                               }`}
                             >
-                              <input
-                                type="radio"
-                                name={`otroEstado-${index}`}
-                                checked={otro.estado === opcion}
-                                onChange={() => manejarCambioOtro(index, "estado", opcion)}
-                                className="sr-only"
-                              />
                               {opcion}
-                            </label>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -445,7 +686,8 @@ export default function ListaChequeoCondicionesSeguridadForm() {
                         <input
                           value={otro.observaciones}
                           onChange={(e) => manejarCambioOtro(index, "observaciones", e.target.value)}
-                          className={campoTexto}
+                          disabled={otro.estado === "Cumple"}
+                          className={`${campoTexto} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none`}
                         />
                       </div>
                     </div>
@@ -488,3 +730,6 @@ export default function ListaChequeoCondicionesSeguridadForm() {
     </div>
   );
 }
+
+
+

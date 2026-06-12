@@ -1,12 +1,41 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
-import { CalendarDays, Check, ClipboardList, ImageUp, PenLine, Settings, ShieldCheck } from "lucide-react";
-import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
+import {
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  Camera,
+  Check,
+  ClipboardList,
+  Clock3,
+  Eye,
+  FileCheck2,
+  FilePlus2,
+  FileWarning,
+  Grid2X2,
+  HardHat,
+  ImageUp,
+  List,
+  PenLine,
+  Search,
+  Settings,
+  ShieldCheck,
+  UserCheck,
+  Wrench,
+  XCircle,
+} from "lucide-react";
+import {
+  limpiarFirmaParaJson,
+  limpiarImagenParaJson,
+  mapConceptoToId,
+  registrarJsonFinalFormulario,
+} from "../components/jsonFormulario";
 import {
   decisionOptions as opcionesDecision,
   inspectionTypeKeys as clavesTiposInspeccion,
@@ -35,6 +64,13 @@ const METADATOS_FORMATO = {
   codigo: "HSE-F006",
   fecha: "2025-09-18",
   version: "04",
+};
+
+const perfilRocaActual = {
+  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
+  cargo: "DESARROLLADOR JUNIOR",
+  proceso: "GESTION DE TECNOLOGIA",
+  compania: "INCOMINERIA S.A.S.",
 };
 
 const claseCampoFecha =
@@ -66,6 +102,42 @@ type DatosFirma = {
   responsableCargo: string;
   responsableFirma: string;
   responsableFirmado: boolean;
+};
+
+type RespuestaChecklistGuardada = {
+  key: string;
+  factor: string;
+  instrucciones: string | string[];
+  conceptoId: number | null;
+  comentario: string;
+};
+
+type RegistroContraCaidasGuardado = {
+  fileName?: string;
+  registro?: {
+    fechaRegistro?: string;
+    usuarioEmail?: string;
+  };
+  inspeccion?: {
+    tipo?: string;
+    nombre?: string;
+  };
+  datosEquipo?: Record<string, string> & {
+    imagenEquipo?: {
+      fileName?: string;
+      hasFile?: boolean;
+      fileUrl?: string;
+    } | null;
+  };
+  respuestasChecklist?: RespuestaChecklistGuardada[];
+  cierreInspeccion?: {
+    comentariosFinales?: string;
+    decisionFinalId?: number | null;
+  };
+  firmas?: {
+    firmaInspector?: { hasFile?: boolean } | null;
+    firmaResponsable?: { hasFile?: boolean } | null;
+  };
 };
 
 const firmasIniciales: DatosFirma = {
@@ -117,11 +189,52 @@ const imagenesBotonesInspeccion: Record<ClaveTipoInspeccion, string> = {
   tieoff: "/Iconos/tie-off.png",
   "linea-vida": "/Iconos/lineadevida.png",
 };
+const normalizarTexto = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const obtenerMesesPeriodicidad = (periodicidad: string) => {
+  const valor = normalizarTexto(periodicidad);
+  if (valor.includes("mensual")) return 1;
+  if (valor.includes("trimestral")) return 3;
+  if (valor.includes("semestral")) return 6;
+  if (valor.includes("anual")) return 12;
+  const meses = valor.match(/(\d+)\s*mes/);
+  if (meses?.[1]) return Number(meses[1]);
+  return null;
+};
+const sumarMeses = (fecha: string, meses: number) => {
+  const base = new Date(`${fecha}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return "";
+  base.setMonth(base.getMonth() + meses);
+  return base.toISOString().slice(0, 10);
+};
+const calcularProximaInspeccion = (fechaInspeccion: string, periodicidad: string) => {
+  const meses = obtenerMesesPeriodicidad(periodicidad);
+  if (!fechaInspeccion || !meses) return "";
+  return sumarMeses(fechaInspeccion, meses);
+};
+const obtenerEstadoVigencia = (proximaInspeccion: string) => {
+  if (!proximaInspeccion) return "Sin fecha";
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const fecha = new Date(`${proximaInspeccion}T00:00:00`);
+  if (Number.isNaN(fecha.getTime())) return "Sin fecha";
+  const dias = Math.ceil((fecha.getTime() - hoy.getTime()) / 86400000);
+  if (dias < 0) return "Vencida";
+  if (dias <= 30) return "Próxima a vencer";
+  return "Vigente";
+};
+const mostrarFecha = (fecha: string) => fecha || "-";
+const obtenerRegistroRegistrosId = (registro: RegistroContraCaidasGuardado) =>
+  registro.fileName || registro.registro?.fechaRegistro || `${registro.registro?.usuarioEmail || "registro"}-${registro.inspeccion?.tipo || ""}`;
 
 export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [datosGenerales, setDatosGenerales] = useState(datosGeneralesIniciales);
   const [urlVistaPreviaImagen, setUrlVistaPreviaImagen] = useState("");
   const [nombreImagen, setNombreImagen] = useState("");
+  const [imagenInputKey, setImagenInputKey] = useState(0);
   const [datosRegistrados, setDatosRegistrados] = useState(false);
   const [tipoInspeccionSeleccionado, setTipoInspeccionSeleccionado] = useState(clavesTiposInspeccion[0]);
   const [selectorInspeccionContraido, setSelectorInspeccionContraido] = useState(false);
@@ -133,6 +246,27 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
   const [firmas, setFirmas] = useState<DatosFirma>(firmasIniciales);
+  const [busquedaRegistros, setBusquedaRegistros] = useState("");
+  const [filtroConceptoRegistros, setFiltroConceptoRegistros] = useState<"todos" | "pendiente" | "aceptado" | "rechazado">("todos");
+  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
+  const [registrosRegistros, setRegistrosRegistros] = useState<RegistroContraCaidasGuardado[]>([]);
+  const [cargandoRegistros, setCargandoRegistros] = useState(false);
+  const [registroRegistrosSeleccionadoId, setRegistroRegistrosSeleccionadoId] = useState("");
+
+  const cargarRegistrosRegistros = async () => {
+    setCargandoRegistros(true);
+    try {
+      const respuesta = await fetch("/api/formatos/inspeccion-contra-caidas/respuestas", { cache: "no-store" });
+      if (!respuesta.ok) throw new Error("No se pudieron consultar los registros.");
+      const datos = (await respuesta.json()) as { registros?: RegistroContraCaidasGuardado[] };
+      setRegistrosRegistros(datos.registros || []);
+    } catch (error) {
+      console.error("Error cargando registros del Registros:", error);
+      setRegistrosRegistros([]);
+    } finally {
+      setCargandoRegistros(false);
+    }
+  };
 
   const listaChequeoActual = useMemo(() => tiposInspeccion[tipoInspeccionSeleccionado].checklist || [], [tipoInspeccionSeleccionado]);
   const esInspeccionArnes = tipoInspeccionSeleccionado === "arnes";
@@ -171,6 +305,175 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     () => listaChequeoActual.length > 0 && listaChequeoActual.every((item) => Boolean(respuestasListaChequeo[item.key]?.concepto)),
     [listaChequeoActual, respuestasListaChequeo]
   );
+  const resumenRegistros = useMemo(() => {
+    const total = listaChequeoActual.length;
+    const aceptados = listaChequeoActual.filter((item) => respuestasListaChequeo[item.key]?.concepto === "ACEPTADO").length;
+    const rechazados = listaChequeoActual.filter((item) => respuestasListaChequeo[item.key]?.concepto === "RECHAZADO").length;
+    return {
+      total,
+      aceptados,
+      rechazados,
+      pendientes: Math.max(total - aceptados - rechazados, 0),
+      firmasCompletas: firmas.inspectorFirmado && firmas.responsableFirmado,
+    };
+  }, [firmas.inspectorFirmado, firmas.responsableFirmado, listaChequeoActual, respuestasListaChequeo]);
+  const filasRegistros = useMemo(() => {
+    const busqueda = busquedaRegistros.trim().toLowerCase();
+    return listaChequeoActual.filter((item) => {
+      const respuesta = respuestasListaChequeo[item.key];
+      const concepto = respuesta?.concepto || "";
+      const instrucciones = Array.isArray(item.instrucciones) ? item.instrucciones.join(" ") : item.instrucciones;
+      const coincideBusqueda = !busqueda || `${item.factor} ${instrucciones} ${respuesta?.comentario || ""}`.toLowerCase().includes(busqueda);
+      const coincideConcepto =
+        filtroConceptoRegistros === "todos" ||
+        (filtroConceptoRegistros === "pendiente" && !concepto) ||
+        (filtroConceptoRegistros === "aceptado" && concepto === "ACEPTADO") ||
+        (filtroConceptoRegistros === "rechazado" && concepto === "RECHAZADO");
+      return coincideBusqueda && coincideConcepto;
+    });
+  }, [busquedaRegistros, filtroConceptoRegistros, listaChequeoActual, respuestasListaChequeo]);
+  const registrosFiltradosRegistros = useMemo(() => {
+    const busqueda = busquedaRegistros.trim().toLowerCase();
+    return registrosRegistros.filter((registro) => {
+      const datosEquipo = registro.datosEquipo || {};
+      const textoBusqueda = [
+        registro.fileName,
+        registro.inspeccion?.nombre,
+        registro.registro?.usuarioEmail,
+        datosEquipo.fabricante,
+        datosEquipo.modelo,
+        datosEquipo.numeroSerie,
+        datosEquipo.numeroInterno,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const decisionId = registro.cierreInspeccion?.decisionFinalId;
+      const coincideBusqueda = !busqueda || textoBusqueda.includes(busqueda);
+      const coincideConcepto =
+        filtroConceptoRegistros === "todos" ||
+        (filtroConceptoRegistros === "pendiente" && !decisionId) ||
+        (filtroConceptoRegistros === "aceptado" && decisionId === 1) ||
+        (filtroConceptoRegistros === "rechazado" && decisionId === 2);
+      return coincideBusqueda && coincideConcepto;
+    });
+  }, [busquedaRegistros, filtroConceptoRegistros, registrosRegistros]);
+  const resumenRegistrosRegistros = useMemo(() => {
+    const total = registrosFiltradosRegistros.length;
+    const aprobados = registrosFiltradosRegistros.filter((registro) => registro.cierreInspeccion?.decisionFinalId === 1).length;
+    const rechazados = registrosFiltradosRegistros.filter((registro) => registro.cierreInspeccion?.decisionFinalId === 2).length;
+    const pendientes = registrosFiltradosRegistros.filter((registro) => !registro.cierreInspeccion?.decisionFinalId).length;
+    const factores = registrosFiltradosRegistros.flatMap((registro) => registro.respuestasChecklist || []);
+    const factoresAceptados = factores.filter((item) => item.conceptoId === 1).length;
+    const factoresRechazados = factores.filter((item) => item.conceptoId === 2).length;
+    const factoresPendientes = factores.filter((item) => !item.conceptoId).length;
+    const totalFactoresEvaluados = factoresAceptados + factoresRechazados;
+    const porcentajeRechazo = totalFactoresEvaluados > 0 ? Math.round((factoresRechazados / totalFactoresEvaluados) * 100) : 0;
+    const registrosIncompletos = registrosFiltradosRegistros.filter((registro) => {
+      const tieneDecision = Boolean(registro.cierreInspeccion?.decisionFinalId);
+      const tieneFirmas = Boolean(registro.firmas?.firmaInspector?.hasFile && registro.firmas?.firmaResponsable?.hasFile);
+      return !tieneDecision || !tieneFirmas;
+    }).length;
+
+    return {
+      total,
+      aprobados,
+      rechazados,
+      pendientes,
+      factoresAceptados,
+      factoresRechazados,
+      factoresPendientes,
+      totalFactores: factores.length,
+      porcentajeRechazo,
+      registrosIncompletos,
+    };
+  }, [registrosFiltradosRegistros]);
+  const inspeccionesPorTipoRegistros = useMemo(() => {
+    const conteo = registrosFiltradosRegistros.reduce<Record<string, number>>((acc, registro) => {
+      const tipo = registro.inspeccion?.nombre || "Sin tipo";
+      acc[tipo] = (acc[tipo] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
+  }, [registrosFiltradosRegistros]);
+  const inspeccionesPorFechaRegistros = useMemo(() => {
+    const conteo = registrosFiltradosRegistros.reduce<Record<string, number>>((acc, registro) => {
+      const fecha = registro.datosEquipo?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "Sin fecha";
+      acc[fecha] = (acc[fecha] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo)
+      .sort(([fechaA], [fechaB]) => fechaB.localeCompare(fechaA))
+      .map(([label, value]) => ({ label, value }));
+  }, [registrosFiltradosRegistros]);
+  const ultimoRegistroRegistros = registrosFiltradosRegistros[0] || registrosRegistros[0];
+  const registroRegistrosSeleccionado = useMemo(
+    () => registrosRegistros.find((registro) => obtenerRegistroRegistrosId(registro) === registroRegistrosSeleccionadoId) || null,
+    [registroRegistrosSeleccionadoId, registrosRegistros]
+  );
+  const analiticaRegistros = useMemo(() => {
+    const proximaInspeccion = calcularProximaInspeccion(datosGenerales.fechaInspeccion, datosGenerales.periodicidad);
+    const estadoVigencia = obtenerEstadoVigencia(proximaInspeccion);
+    const factoresRechazados = listaChequeoActual.filter((item) => respuestasListaChequeo[item.key]?.concepto === "RECHAZADO");
+    const factoresAceptados = listaChequeoActual.filter((item) => respuestasListaChequeo[item.key]?.concepto === "ACEPTADO");
+    const factoresPendientes = listaChequeoActual.filter((item) => !respuestasListaChequeo[item.key]?.concepto);
+    const totalEvaluado = factoresAceptados.length + factoresRechazados.length;
+    const porcentajeRechazo = totalEvaluado > 0 ? Math.round((factoresRechazados.length / totalEvaluado) * 100) : 0;
+    const decisionAprobada = decisionFinal === "apto";
+    const decisionRechazada = decisionFinal === "no-apto";
+    const tieneAntecedentes = Boolean(datosGenerales.antecedentesEquipo.trim());
+    const tieneEvidencia = Boolean(nombreImagen);
+    const camposDocumentales = [
+      { key: "datosEquipo", label: "Datos del equipo", completo: datosRegistrados },
+      { key: "fechaInspeccion", label: "Fecha de inspección", completo: Boolean(datosGenerales.fechaInspeccion) },
+      { key: "numeroInterno", label: "Número interno", completo: Boolean(datosGenerales.numeroInterno) },
+      { key: "numeroSerie", label: "Número de serie", completo: Boolean(datosGenerales.numeroSerie) },
+      { key: "certificado", label: "Certificado", completo: Boolean(datosGenerales.certificado) },
+      { key: "evidencia", label: "Evidencia fotográfica", completo: tieneEvidencia },
+      { key: "decisionFinal", label: "Decisión final", completo: Boolean(decisionFinal) },
+      { key: "firmaInspector", label: "Firma inspector", completo: firmas.inspectorFirmado },
+      { key: "firmaResponsable", label: "Firma responsable", completo: firmas.responsableFirmado },
+    ];
+    const pendientesDocumentales = camposDocumentales.filter((campo) => !campo.completo);
+    const avanceDocumental = Math.round(((camposDocumentales.length - pendientesDocumentales.length) / camposDocumentales.length) * 100);
+    const avanceTecnico = resumenRegistros.total > 0 ? Math.round(((resumenRegistros.aceptados + resumenRegistros.rechazados) / resumenRegistros.total) * 100) : 0;
+    const estadoDecision =
+      decisionFinal === "apto" ? "Apto" : decisionFinal === "no-apto" ? "No apto" : "Pendiente";
+
+    return {
+      proximaInspeccion,
+      estadoVigencia,
+      factoresRechazados,
+      factoresAceptados,
+      factoresPendientes,
+      porcentajeRechazo,
+      decisionAprobada,
+      decisionRechazada,
+      tieneAntecedentes,
+      tieneEvidencia,
+      camposDocumentales,
+      pendientesDocumentales,
+      avanceDocumental,
+      avanceTecnico,
+      estadoDecision,
+      registroCompleto: pendientesDocumentales.length === 0 && resumenRegistros.pendientes === 0,
+    };
+  }, [
+    datosGenerales.antecedentesEquipo,
+    datosGenerales.certificado,
+    datosGenerales.fechaInspeccion,
+    datosGenerales.numeroInterno,
+    datosGenerales.numeroSerie,
+    datosGenerales.periodicidad,
+    datosRegistrados,
+    decisionFinal,
+    firmas.inspectorFirmado,
+    firmas.responsableFirmado,
+    listaChequeoActual,
+    nombreImagen,
+    respuestasListaChequeo,
+    resumenRegistros.pendientes,
+  ]);
 
   const manejarCambioCampo = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target as HTMLInputElement;
@@ -244,7 +547,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const manejarCambioConcepto = (key: string, concepto: ConceptoRevision) => {
     setRespuestasListaChequeo((prev) => ({
       ...prev,
-      [key]: { concepto, comentario: prev[key]?.comentario || "" },
+      [key]: { concepto, comentario: concepto === "RECHAZADO" ? prev[key]?.comentario || "" : "" },
     }));
   };
 
@@ -253,6 +556,11 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
       ...prev,
       [key]: { concepto: prev[key]?.concepto || "", comentario },
     }));
+  };
+
+  const verFactorDesdeRegistros = (key: string) => {
+    setVistaActiva("formulario");
+    window.setTimeout(() => enfocarCampoFaltante(`concepto-${key}`), 0);
   };
 
   const seleccionarTipoInspeccion = (tipo: ClaveTipoInspeccion) => {
@@ -302,8 +610,30 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     setFirmas((prev) => ({ ...prev, [campo]: siguienteValor }));
   };
 
+  const limpiarFormularioParaNuevoRegistro = () => {
+    if (urlVistaPreviaImagen) URL.revokeObjectURL(urlVistaPreviaImagen);
+    setDatosGenerales(datosGeneralesIniciales);
+    setUrlVistaPreviaImagen("");
+    setNombreImagen("");
+    setImagenInputKey((prev) => prev + 1);
+    setDatosRegistrados(false);
+    setTipoInspeccionSeleccionado(clavesTiposInspeccion[0]);
+    setSelectorInspeccionContraido(false);
+    setDecisionFinal("");
+    setComentariosFinales("");
+    setRespuestasListaChequeo({});
+    setMostrarDatosAdicionales(false);
+    setFirmas(firmasIniciales);
+    setFirmaTieneTrazo(false);
+    setRolModalFirma(null);
+    setBusquedaRegistros("");
+    setFiltroConceptoRegistros("todos");
+    setVistaActiva("formulario");
+    referenciaFirma.current?.clear();
+  };
+
   const construirRespuestaJson = () => {
-    const decisionFinalTexto = opcionesDecision.find((option) => option.value === decisionFinal)?.label || "";
+    const { email, ...datosEquipo } = datosGenerales;
 
     return {
       formato: {
@@ -313,23 +643,27 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
         version: METADATOS_FORMATO.version,
         area: "Gestión HSE",
       },
-      fechaRegistro: new Date().toISOString(),
+      registro: {
+        fechaRegistro: new Date().toISOString(),
+        usuarioEmail: email,
+      },
       inspeccion: {
         tipo: tipoInspeccionSeleccionado,
         nombre: tiposInspeccion[tipoInspeccionSeleccionado].label,
       },
       datosEquipo: {
-        ...datosGenerales,
-        imagenEquipo: {
-          nombreArchivo: nombreImagen || "",
-          imagenAdjunta: Boolean(nombreImagen),
-        },
+        ...datosEquipo,
+        imagenEquipo: limpiarImagenParaJson({
+          nombreArchivo: nombreImagen,
+          carpeta: "evidencias",
+          prefijo: `equipo-${tipoInspeccionSeleccionado}`,
+        }),
       },
       respuestasChecklist: listaChequeoActual.map((item) => ({
         key: item.key,
         factor: item.factor,
         instrucciones: item.instrucciones,
-        concepto: respuestasListaChequeo[item.key]?.concepto || "",
+        conceptoId: mapConceptoToId(respuestasListaChequeo[item.key]?.concepto || ""),
         comentario: respuestasListaChequeo[item.key]?.comentario || "",
       })),
       datosAdicionalesChecklist: mostrarDatosAdicionales
@@ -337,16 +671,18 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
             key: item.key,
             factor: item.factor,
             instrucciones: item.instrucciones,
-            concepto: respuestasListaChequeo[item.key]?.concepto || "",
+            conceptoId: mapConceptoToId(respuestasListaChequeo[item.key]?.concepto || ""),
             detalleApoyo: respuestasListaChequeo[item.key]?.comentario || "",
           }))
         : [],
       cierreInspeccion: {
         comentariosFinales,
-        decisionFinal,
-        decisionFinalTexto,
+        decisionFinalId: decisionFinal === "apto" ? 1 : decisionFinal === "no-apto" ? 2 : null,
       },
-      firmas: firmas,
+      firmas: {
+        firmaInspector: limpiarFirmaParaJson(firmas.inspectorFirma, "firma-inspector"),
+        firmaResponsable: limpiarFirmaParaJson(firmas.responsableFirma, "firma-responsable"),
+      },
     };
   };
 
@@ -380,8 +716,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F006?")) return;
     const respuestaJson = construirRespuestaJson();
-    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
-    console.log("JSON del formulario HSE-F006:", respuestaJsonFormateada);
+    registrarJsonFinalFormulario(respuestaJson);
 
     try {
       const respuestaHttp = await fetch("/api/formatos/inspeccion-contra-caidas/respuestas", {
@@ -394,10 +729,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
         throw new Error("No se pudo guardar la respuesta en JSON.");
       }
 
-      const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
-      console.log("Respuesta guardada en JSON:", resultadoGuardado);
-      console.log("Registro completo del formulario:", respuestaJson);
-      localStorage.removeItem("borrador-inspeccion-equipos-proteccion-contra-caidas");
+      await respuestaHttp.json();
+      limpiarFormularioParaNuevoRegistro();
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
@@ -453,7 +786,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   <input
                     value={respuestasListaChequeo[item.key]?.comentario || ""}
                     onChange={(e) => manejarCambioComentario(item.key, e.target.value)}
-                    className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                    disabled={concepto !== "RECHAZADO"}
+                    className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
                     placeholder="Solo si aplica"
                   />
                 ) : (
@@ -468,174 +802,144 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[920px] table-fixed border-separate border-spacing-0 text-sm">
-        <colgroup>
-          <col className="w-[54%]" />
-          <col className="w-[17%]" />
-          <col className="w-[29%]" />
-        </colgroup>
-        <thead className="bg-emerald-900 text-left text-white">
-          <tr>
-            <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide">FACTORES GENERALES</th>
-            <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide">CONCEPTO</th>
-            <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide">{opciones.detailTitle}</th>
-          </tr>
-        </thead>
-        <tbody className="bg-white">
-          {opciones.items.map((item) => {
-            const concepto = respuestasListaChequeo[item.key]?.concepto || "";
+        <table className="w-full min-w-[920px] table-fixed border-separate border-spacing-0 text-sm">
+          <colgroup>
+            <col className="w-[54%]" />
+            <col className="w-[17%]" />
+            <col className="w-[29%]" />
+          </colgroup>
+          <thead className="bg-emerald-900 text-left text-white">
+            <tr>
+              <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide">FACTORES GENERALES</th>
+              <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide">CONCEPTO</th>
+              <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide">{opciones.detailTitle}</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white">
+            {opciones.items.map((item) => {
+              const concepto = respuestasListaChequeo[item.key]?.concepto || "";
 
-            return (
-              <tr key={`${opciones.mode}-${item.key}`} className="border-b border-slate-200 transition hover:bg-emerald-50/40">
-                <td className="border-b border-slate-200 px-5 py-4 align-top">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-sm font-bold leading-5 text-slate-950">{item.factor}</div>
-                  {Array.isArray(item.instrucciones) ? (
-                    <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-5 text-slate-700">
-                      {item.instrucciones.map((instruccion) => (
-                        <li key={instruccion}>{instruccion}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-2 text-xs leading-5 text-slate-700">{item.instrucciones}</p>
-                  )}
-                  </div>
-                </td>
-                <td className="border-b border-slate-200 px-4 py-4 align-top">
-                  {opciones.mode === "principal" ? (
-                    <select
-                      data-required-id={`concepto-${item.key}`}
-                      value={concepto}
-                      onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
-                      className="mx-auto block h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-center text-xs font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                    >
-                      <option value="">--Seleccione--</option>
-                      <option value="ACEPTADO">ACEPTADO</option>
-                      <option value="RECHAZADO">RECHAZADO</option>
-                    </select>
-                  ) : (
-                    <div className="mx-auto flex h-11 w-full items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-bold text-emerald-950 shadow-sm">
-                      {concepto || "-"}
+              return (
+                <tr key={`${opciones.mode}-${item.key}`} className="border-b border-slate-200 transition hover:bg-emerald-50/40">
+                  <td className="border-b border-slate-200 px-5 py-4 align-top">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="text-sm font-bold leading-5 text-slate-950">{item.factor}</div>
+                      {Array.isArray(item.instrucciones) ? (
+                        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs leading-5 text-slate-700">
+                          {item.instrucciones.map((instruccion) => (
+                            <li key={instruccion}>{instruccion}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-xs leading-5 text-slate-700">{item.instrucciones}</p>
+                      )}
                     </div>
-                  )}
-                </td>
-                <td className="border-b border-slate-200 px-5 py-4 align-top">
-                  {opciones.mode === "principal" ? (
-                    <input
-                      value={respuestasListaChequeo[item.key]?.comentario || ""}
-                      onChange={(e) => manejarCambioComentario(item.key, e.target.value)}
-                      className="block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      placeholder="Solo si aplica"
-                    />
-                  ) : (
-                    <div className="flex min-h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-900 shadow-sm">
-                      {respuestasListaChequeo[item.key]?.comentario || ""}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </td>
+                  <td className="border-b border-slate-200 px-4 py-4 align-top">
+                    {opciones.mode === "principal" ? (
+                      <select
+                        data-required-id={`concepto-${item.key}`}
+                        value={concepto}
+                        onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
+                        className="mx-auto block h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-center text-xs font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+                      >
+                        <option value="">--Seleccione--</option>
+                        <option value="ACEPTADO">ACEPTADO</option>
+                        <option value="RECHAZADO">RECHAZADO</option>
+                      </select>
+                    ) : (
+                      <div className="mx-auto flex h-11 w-full items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-bold text-emerald-950 shadow-sm">
+                        {concepto || "-"}
+                      </div>
+                    )}
+                  </td>
+                  <td className="border-b border-slate-200 px-5 py-4 align-top">
+                    {opciones.mode === "principal" ? (
+                      <input
+                        value={respuestasListaChequeo[item.key]?.comentario || ""}
+                        onChange={(e) => manejarCambioComentario(item.key, e.target.value)}
+                        disabled={concepto !== "RECHAZADO"}
+                        className="block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                        placeholder="Solo si aplica"
+                      />
+                    ) : (
+                      <div className="flex min-h-11 w-full items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-900 shadow-sm">
+                        {respuestasListaChequeo[item.key]?.comentario || ""}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 
-  const estadoProteccion = {
-    datosGenerales,
-    urlVistaPreviaImagen,
-    nombreImagen,
-    datosRegistrados,
-    tipoInspeccionSeleccionado,
-    selectorInspeccionContraido,
-    decisionFinal,
-    comentariosFinales,
-    respuestasListaChequeo,
-    mostrarDatosAdicionales,
-    firmas,
-  };
-  const estadoInicialProteccion = {
-    datosGenerales: datosGeneralesIniciales,
-    urlVistaPreviaImagen: "",
-    nombreImagen: "",
-    datosRegistrados: false,
-    tipoInspeccionSeleccionado: clavesTiposInspeccion[0],
-    selectorInspeccionContraido: false,
-    decisionFinal: "",
-    comentariosFinales: "",
-    respuestasListaChequeo: {} as Record<string, RespuestaListaChequeo>,
-    mostrarDatosAdicionales: false,
-    firmas: firmasIniciales,
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
-      <ProteccionDatosFormulario
-        storageKey="borrador-inspeccion-equipos-proteccion-contra-caidas"
-        datos={estadoProteccion}
-        datosIniciales={estadoInicialProteccion}
-        onRestaurar={(borrador) => {
-          setDatosGenerales(borrador.datosGenerales);
-          setUrlVistaPreviaImagen(borrador.urlVistaPreviaImagen);
-          setNombreImagen(borrador.nombreImagen);
-          setDatosRegistrados(borrador.datosRegistrados);
-          setTipoInspeccionSeleccionado(borrador.tipoInspeccionSeleccionado);
-          setSelectorInspeccionContraido(borrador.selectorInspeccionContraido);
-          setDecisionFinal(borrador.decisionFinal);
-          setComentariosFinales(borrador.comentariosFinales);
-          setRespuestasListaChequeo(borrador.respuestasListaChequeo);
-          setMostrarDatosAdicionales(borrador.mostrarDatosAdicionales);
-          setFirmas(borrador.firmas);
-          setFirmaTieneTrazo(false);
-          setRolModalFirma(null);
-          referenciaFirma.current?.clear();
-        }}
-        onDescartar={() => {
-          setDatosGenerales(datosGeneralesIniciales);
-          setUrlVistaPreviaImagen("");
-          setNombreImagen("");
-          setDatosRegistrados(false);
-          setTipoInspeccionSeleccionado(clavesTiposInspeccion[0]);
-          setSelectorInspeccionContraido(false);
-          setDecisionFinal("");
-          setComentariosFinales("");
-          setRespuestasListaChequeo({});
-          setMostrarDatosAdicionales(false);
-          setFirmas(firmasIniciales);
-          setFirmaTieneTrazo(false);
-          setRolModalFirma(null);
-          referenciaFirma.current?.clear();
-        }}
-      />
       <div className="w-full max-w-full">
-        <div className="mb-6 overflow-x-auto bg-white">
-          <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
-            <div className="min-h-[112px] border-r border-slate-400 bg-white" aria-label="Espacio reservado para el logo" />
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
+          <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
+            <div>
+              <div className="flex gap-3 sm:items-start">
+                <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:size-14">
+                  <HardHat className="size-7 sm:size-8" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-2xl">
+                      Inspección de equipos de protección contra caídas
+                    </h1>
+                    <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-bold text-white">{METADATOS_FORMATO.codigo}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Integrado en ROCA con ejecutantes firmantes y responsables de aprobación.
+                  </p>
+                </div>
+              </div>
 
-            <div className="border-r border-slate-400">
-              <div className="border-b border-slate-400 py-1 text-center font-bold uppercase">Gestión HSE</div>
-              <div className="flex min-h-[88px] items-start justify-center px-4 pt-3 text-center font-bold uppercase">
-                Inspección de equipos de protección contra caídas
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Compañía</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.compania}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Versión</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{METADATOS_FORMATO.version}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado</p>
+                  <p className="mt-2 text-sm font-bold text-slate-950">
+                    {datosRegistrados && primeraTablaCompleta && decisionFinal && resumenRegistros.firmasCompletas ? "Listo para radicar" : "En diligenciamiento"}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-rows-[24px_1fr_24px]">
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Codigo:</span> {METADATOS_FORMATO.codigo}
-              </div>
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Fecha:</span> {METADATOS_FORMATO.fecha}
-              </div>
-              <div className="px-2 py-1">
-                <span className="font-bold italic">Version:</span> {METADATOS_FORMATO.version}
+            <div className="rounded-2xl border border-slate-200 bg-white/75 p-3 shadow-sm sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Solicitante</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.nombre}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Cargo</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.cargo}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Proceso</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.proceso}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
 
         <div
-          className={`mb-6 border-t-2 border-blue-500 pt-8 ${
+          className={`mb-6 ${
             selectorInspeccionContraido ? "flex justify-center" : "grid grid-cols-2 gap-3 md:grid-cols-4"
           }`}
         >
@@ -808,7 +1112,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 <div className="p-5">
                   <label className="text-sm font-semibold text-slate-700">Adjuntar imagen del equipo</label>
                   <label className="mt-2 flex min-h-[170px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-600 bg-white px-4 py-6 text-center transition hover:bg-emerald-50">
-                    <input type="file" accept="image/*" onChange={manejarCargaImagen} className="sr-only" />
+                    <input key={imagenInputKey} type="file" accept="image/*" onChange={manejarCargaImagen} className="sr-only" />
                     <span className="text-sm font-bold text-emerald-900">Arrastra una imagen aquí o haz clic para seleccionar</span>
                     <span className="mt-1 text-xs text-slate-600">Formatos permitidos: JPG, PNG o WEBP</span>
                     <span className="mt-3 max-w-full truncate rounded-full bg-emerald-50 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm">
@@ -1132,4 +1436,6 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     </div>
   );
 }
+
+
 

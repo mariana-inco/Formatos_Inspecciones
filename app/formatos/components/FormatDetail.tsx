@@ -7,7 +7,7 @@ type FormatDetailProps = {
   responsable: string;
 };
 
-export function FormatDetail({ codigo, nombre, area, responsable }: FormatDetailProps) {
+export function FormatDetail({ codigo, nombre, responsable }: FormatDetailProps) {
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-10 sm:px-10">
       <div className="mx-auto max-w-4xl rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm sm:p-12">
@@ -16,7 +16,6 @@ export function FormatDetail({ codigo, nombre, area, responsable }: FormatDetail
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-900">{codigo}</p>
             <h1 className="mt-4 text-2xl font-semibold text-slate-950 sm:text-3xl">{nombre}</h1>
             <div className="mt-4 flex flex-col gap-2 text-sm text-slate-700 sm:flex-row sm:flex-wrap">
-              <span className="rounded-full bg-slate-100 px-3 py-1.5">Área: {area}</span>
               <span className="rounded-full bg-slate-100 px-3 py-1.5">Responsable: {responsable}</span>
             </div>
           </div>

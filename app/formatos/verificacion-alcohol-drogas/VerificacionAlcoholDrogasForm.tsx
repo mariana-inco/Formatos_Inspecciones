@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
-import { ClipboardList, PenLine, ShieldCheck, Upload, UserCog, UsersRound } from "lucide-react";
-import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
+import { Check, ClipboardList, Eye, FilePlus2, Grid2X2, HardHat, PenLine, Search, ShieldCheck, Upload, UserCog, UsersRound, X } from "lucide-react";
+import { limpiarFirmaParaJson, limpiarImagenParaJson, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F020",
@@ -51,6 +51,73 @@ type DatosFormulario = {
 
 type RegistroPersona = DatosFormulario;
 
+type RegistroPersonaGuardado = {
+  numeroRegistro: number;
+  personaEvaluada?: {
+    opcion?: string;
+    nombre?: string;
+    numeroIdentificacion?: string;
+    empresaContratista?: string;
+    cargo?: string;
+    resultadoPrimeraPruebaInicial?: ResultadoPrueba;
+    gradoDetectadoMg100ml?: string;
+    resultadoSegundaPruebaConfirmatoria?: ResultadoPrueba;
+    gradoDetectadoSegundaPruebaMg100ml?: string;
+    imagenEvidencia?: unknown;
+    firmas?: {
+      firmaPersonaEvaluada?: { hasFile?: boolean } | null;
+    };
+  };
+  testigo?: {
+    hayTestigo?: RespuestaSiNo;
+    nombre?: string;
+    cargo?: string;
+    confirmar?: string;
+  };
+};
+
+type FormularioAlcoholGuardado = {
+  fileName?: string;
+  registro?: {
+    fechaRegistro?: string;
+    usuarioEmail?: string;
+  };
+  datosGenerales?: {
+    centroTrabajoSede?: string;
+    tipoPrueba?: string;
+    criteriosTomaMuestra?: string;
+    equipoUtiliza?: string;
+    realizadoPor?: {
+      tipoIdentificacion?: string;
+      identificacion?: string;
+      nombre?: string;
+      cargo?: string;
+    };
+  };
+  totalRegistros?: number;
+  registros?: RegistroPersonaGuardado[];
+};
+
+type FilaRegistrosAlcohol = {
+  id: string;
+  archivo?: string;
+  fecha: string;
+  sede: string;
+  evaluador: string;
+  criterio: string;
+  testigo: string;
+  resultado: "Negativo" | "Positivo";
+  formulario: FormularioAlcoholGuardado;
+  registro: RegistroPersonaGuardado;
+};
+
+const perfilRocaActual = {
+  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
+  cargo: "DESARROLLADOR JUNIOR",
+  proceso: "GESTION DE TECNOLOGIA",
+  compania: "INCOMINERIA S.A.S.",
+};
+
 const datosIniciales: DatosFormulario = {
   email: "",
   centroTrabajoSede: "",
@@ -92,6 +159,18 @@ const marcaObligatorio = <span className="text-red-600">*</span>;
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const soloDecimal = (value: string) => value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
+const normalizarBusqueda = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const obtenerResultadoRegistros = (registro: RegistroPersonaGuardado): "Negativo" | "Positivo" => {
+  const primera = registro.personaEvaluada?.resultadoPrimeraPruebaInicial;
+  const segunda = registro.personaEvaluada?.resultadoSegundaPruebaConfirmatoria;
+  return primera === "POSITIVO" || segunda === "POSITIVO" ? "Positivo" : "Negativo";
+};
+const claseResultadoRegistros = (resultado: "Negativo" | "Positivo") =>
+  resultado === "Positivo" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800";
 const enfocarCampoFaltante = (id: string) => {
   const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
   campo?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -105,6 +184,15 @@ const camposSinNumeros = new Set<keyof DatosFormulario>([
   "nombreTestigo",
   "cargoTestigo",
 ]);
+const clasificarGradoAlcohol = (grado: string) => {
+  const valor = Number(grado.replace(",", "."));
+  if (!Number.isFinite(valor)) return "";
+  if (valor < 20) return "NORMAL";
+  if (valor < 40) return "GRADO CERO";
+  if (valor <= 80) return "PRIMER GRADO";
+  if (valor < 150) return "SEGUNDO GRADO";
+  return "TERCER GRADO";
+};
 
 const serializarFirma = (svg: SVGSVGElement) => {
   const firmaClonada = svg.cloneNode(true) as SVGSVGElement;
@@ -127,9 +215,110 @@ export default function VerificacionAlcoholDrogasForm() {
   const [registros, setRegistros] = useState<RegistroPersona[]>([]);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
+  const [evidenciaVisible, setEvidenciaVisible] = useState<{ url: string; nombre: string } | null>(null);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const [imagenInputKey, setImagenInputKey] = useState(0);
+  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
+  const [registrosRegistros, setRegistrosRegistros] = useState<FormularioAlcoholGuardado[]>([]);
+  const [cargandoRegistros, setCargandoRegistros] = useState(false);
+  const [busquedaRegistros, setBusquedaRegistros] = useState("");
+  const [filtroResultadoRegistros, setFiltroResultadoRegistros] = useState<"todos" | "negativo" | "positivo">("todos");
+  const [registroRegistrosSeleccionadoId, setRegistroRegistrosSeleccionadoId] = useState("");
   const referenciaFirma = useRef<SignatureRef>(null);
+
+  const cargarRegistrosRegistros = async () => {
+    setCargandoRegistros(true);
+    try {
+      const respuesta = await fetch("/api/formatos/verificacion-alcohol-drogas/respuestas", { cache: "no-store" });
+      if (!respuesta.ok) throw new Error("No se pudieron consultar los registros.");
+      const datosRespuesta = (await respuesta.json()) as { registros?: FormularioAlcoholGuardado[] };
+      setRegistrosRegistros(datosRespuesta.registros || []);
+    } catch (error) {
+      console.error("Error cargando Registros alcohol y drogas:", error);
+      setRegistrosRegistros([]);
+    } finally {
+      setCargandoRegistros(false);
+    }
+  };
+
+  const filasRegistros = useMemo<FilaRegistrosAlcohol[]>(
+    () =>
+      registrosRegistros.flatMap((formulario) =>
+        (formulario.registros || []).map((registro) => ({
+          id: `${formulario.fileName || formulario.registro?.fechaRegistro || "registro"}-${registro.numeroRegistro}`,
+          archivo: formulario.fileName,
+          fecha: formulario.registro?.fechaRegistro?.slice(0, 10) || "",
+          sede: formulario.datosGenerales?.centroTrabajoSede || "",
+          evaluador: formulario.datosGenerales?.realizadoPor?.nombre || "",
+          criterio: formulario.datosGenerales?.criteriosTomaMuestra || "",
+          testigo: registro.testigo?.hayTestigo === "SI" ? registro.testigo?.nombre || "SI" : "NO",
+          resultado: obtenerResultadoRegistros(registro),
+          formulario,
+          registro,
+        }))
+      ),
+    [registrosRegistros]
+  );
+
+  const filasFiltradasRegistros = useMemo(() => {
+    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
+    return filasRegistros.filter((fila) => {
+      const texto = normalizarBusqueda([
+        fila.sede,
+        fila.evaluador,
+        fila.registro.personaEvaluada?.nombre,
+        fila.criterio,
+      ].filter(Boolean).join(" "));
+      const coincideBusqueda = !busqueda || texto.includes(busqueda);
+      const coincideResultado =
+        filtroResultadoRegistros === "todos" ||
+        (filtroResultadoRegistros === "negativo" && fila.resultado === "Negativo") ||
+        (filtroResultadoRegistros === "positivo" && fila.resultado === "Positivo");
+      return coincideBusqueda && coincideResultado;
+    });
+  }, [busquedaRegistros, filasRegistros, filtroResultadoRegistros]);
+
+  const resumenRegistros = useMemo(
+    () => ({
+      total: filasFiltradasRegistros.length,
+      negativos: filasFiltradasRegistros.filter((fila) => fila.resultado === "Negativo").length,
+      positivos: filasFiltradasRegistros.filter((fila) => fila.resultado === "Positivo").length,
+      conTestigo: filasFiltradasRegistros.filter((fila) => fila.registro.testigo?.hayTestigo === "SI").length,
+    }),
+    [filasFiltradasRegistros]
+  );
+
+  const conteoPorSedeRegistros = useMemo(() => {
+    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
+      const key = fila.sede || "Sin sede";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
+  }, [filasFiltradasRegistros]);
+
+  const conteoPorMuestraRegistros = useMemo(() => {
+    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
+      const key = fila.criterio || "Sin criterio";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
+  }, [filasFiltradasRegistros]);
+
+  const conteoPorFechaRegistros = useMemo(() => {
+    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
+      const key = fila.fecha || "Sin fecha";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo).sort(([a], [b]) => b.localeCompare(a)).map(([label, value]) => ({ label, value }));
+  }, [filasFiltradasRegistros]);
+
+  const filaSeleccionadaRegistros = useMemo(
+    () => filasRegistros.find((fila) => fila.id === registroRegistrosSeleccionadoId) || null,
+    [filasRegistros, registroRegistrosSeleccionadoId]
+  );
 
   const manejarCambio = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -331,9 +520,11 @@ export default function VerificacionAlcoholDrogasForm() {
       version: METADATOS_FORMATO.version,
       area: METADATOS_FORMATO.area,
     },
-    fechaRegistro: new Date().toISOString(),
+    registro: {
+      fechaRegistro: new Date().toISOString(),
+      usuarioEmail: registros[0]?.email || datos.email,
+    },
     datosGenerales: {
-      email: registros[0]?.email || datos.email,
       centroTrabajoSede: registros[0]?.centroTrabajoSede || datos.centroTrabajoSede,
       tipoPrueba: registros[0]?.tipoPrueba || datos.tipoPrueba,
       criteriosTomaMuestra: registros[0]?.criteriosTomaMuestra || datos.criteriosTomaMuestra,
@@ -360,14 +551,16 @@ export default function VerificacionAlcoholDrogasForm() {
         gradoDetectadoSegundaPruebaMg100ml: registro.gradoDetectadoSegundaPrueba,
         imagenEvidencia:
           registro.resultadoSegundaPruebaConfirmatoria === "POSITIVO"
-            ? {
+            ? limpiarImagenParaJson({
                 nombreArchivo: registro.imagenEvidenciaNombre,
-                imagenAdjunta: Boolean(registro.imagenEvidenciaUrl),
                 dataUrl: registro.imagenEvidenciaUrl,
-              }
+                carpeta: "evidencias",
+                prefijo: `evidencia-alcohol-drogas-${index + 1}`,
+              })
             : null,
-        firma: registro.firmaPersonaEvaluada,
-        firmaRegistrada: registro.firmaPersonaEvaluadaRegistrada,
+        firmas: {
+          firmaPersonaEvaluada: limpiarFirmaParaJson(registro.firmaPersonaEvaluada, `firma-persona-evaluada-${index + 1}`),
+        },
       },
       testigo: {
         hayTestigo: registro.hayTestigo,
@@ -392,8 +585,7 @@ export default function VerificacionAlcoholDrogasForm() {
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F020?")) return;
     const respuestaJson = construirRespuestaJson();
-    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
-    console.log("JSON del formulario HSE-F020:", respuestaJsonFormateada);
+    registrarJsonFinalFormulario(respuestaJson);
 
     try {
       const respuestaHttp = await fetch("/api/formatos/verificacion-alcohol-drogas/respuestas", {
@@ -406,71 +598,70 @@ export default function VerificacionAlcoholDrogasForm() {
         throw new Error("No se pudo guardar la respuesta en JSON.");
       }
 
-      const resultadoGuardado = (await respuestaHttp.json()) as { fileName: string; filePath: string };
-      console.log("Respuesta guardada en JSON:", resultadoGuardado);
-      console.log("Registro completo del formulario:", respuestaJson);
-      localStorage.removeItem("borrador-verificacion-alcohol-drogas");
+      await respuestaHttp.json();
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
-  const estadoProteccion = { datos, registros, indiceEdicion };
-  const estadoInicialProteccion = {
-    datos: datosIniciales,
-    registros: [] as RegistroPersona[],
-    indiceEdicion: null as number | null,
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
-      <ProteccionDatosFormulario
-        storageKey="borrador-verificacion-alcohol-drogas"
-        datos={estadoProteccion}
-        datosIniciales={estadoInicialProteccion}
-        onRestaurar={(borrador) => {
-          setDatos(borrador.datos);
-          setRegistros(borrador.registros);
-          setIndiceEdicion(borrador.indiceEdicion);
-          setFirmaTieneTrazo(false);
-          setImagenInputKey((prev) => prev + 1);
-          referenciaFirma.current?.clear();
-        }}
-        onDescartar={() => {
-          setDatos(datosIniciales);
-          setRegistros([]);
-          setIndiceEdicion(null);
-          setFirmaTieneTrazo(false);
-          setImagenInputKey((prev) => prev + 1);
-          referenciaFirma.current?.clear();
-        }}
-      />
       <div className="w-full max-w-full">
-        <div className="mb-6 overflow-x-auto bg-white">
-          <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
-            <div className="min-h-[112px] border-r border-slate-400 bg-white" aria-label="Espacio reservado para el logo" />
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
+          <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
+            <div>
+              <div className="flex gap-3 sm:items-start">
+                <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:size-14">
+                  <HardHat className="size-7 sm:size-8" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-2xl">
+                      Verificación en sitio de alcohol y drogas
+                    </h1>
+                    <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-bold text-white">{METADATOS_FORMATO.codigo}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Integrado en ROCA con personas evaluadas, testigos y responsables de verificación.
+                  </p>
+                </div>
+              </div>
 
-            <div className="border-r border-slate-400">
-              <div className="border-b border-slate-400 py-1 text-center font-bold uppercase">{METADATOS_FORMATO.area}</div>
-              <div className="flex min-h-[88px] items-start justify-center px-4 pt-3 text-center font-bold uppercase">
-                {METADATOS_FORMATO.titulo}
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Compañía</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.compania}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Versión</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{METADATOS_FORMATO.version}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado</p>
+                  <p className="mt-2 text-sm font-bold text-slate-950">{registros.length > 0 ? "Listo para enviar" : "En diligenciamiento"}</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-rows-[24px_1fr_24px]">
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Codigo:</span> {METADATOS_FORMATO.codigo}
-              </div>
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Fecha:</span> {METADATOS_FORMATO.fecha}
-              </div>
-              <div className="px-2 py-1">
-                <span className="font-bold italic">Version:</span> {METADATOS_FORMATO.version}
+            <div className="rounded-2xl border border-slate-200 bg-white/75 p-3 shadow-sm sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Solicitante</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.nombre}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Cargo</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.cargo}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Proceso</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.proceso}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <div className="border-t-2 border-blue-500 pt-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -694,9 +885,6 @@ export default function VerificacionAlcoholDrogasForm() {
                       </div>
                     ) : null}
 
-                  </>
-                ) : null}
-
                 <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between md:col-span-2">
                   <div className="flex items-center gap-4">
                     <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white text-slate-700">
@@ -717,6 +905,8 @@ export default function VerificacionAlcoholDrogasForm() {
                   <span className="text-red-600">"Grado Detectado"</span> sea igual o mayor a{" "}
                   <span className="text-red-600">20mg / 100ml</span>
                 </p>
+                  </>
+                ) : null}
               </div>
             </section>
 
@@ -832,20 +1022,30 @@ export default function VerificacionAlcoholDrogasForm() {
                         <p className="text-[11px] font-bold uppercase text-slate-500">Resultado primera prueba inicial</p>
                         <p className="mt-1 text-sm font-semibold text-slate-950">{registro.resultadoPrimeraPruebaInicial}</p>
                         <p className="text-[11px] text-slate-600">{registro.gradoDetectado} mg / 100ml</p>
+                        <p className="text-[11px] font-semibold uppercase text-slate-950">{clasificarGradoAlcohol(registro.gradoDetectado)}</p>
                       </div>
                       <div className="rounded-xl bg-white p-3">
                         <p className="text-[11px] font-bold uppercase text-slate-500">Resultado segunda prueba confirmatoria</p>
                         <p className="mt-1 text-sm font-semibold text-slate-950">{registro.resultadoSegundaPruebaConfirmatoria || "-"}</p>
                         {registro.gradoDetectadoSegundaPrueba ? (
-                          <p className="text-[11px] text-slate-600">{registro.gradoDetectadoSegundaPrueba} mg / 100ml</p>
+                          <>
+                            <p className="text-[11px] text-slate-600">{registro.gradoDetectadoSegundaPrueba} mg / 100ml</p>
+                            <p className="text-[11px] font-semibold uppercase text-slate-950">{clasificarGradoAlcohol(registro.gradoDetectadoSegundaPrueba)}</p>
+                          </>
                         ) : null}
                       </div>
                       <div className="rounded-xl bg-white p-3">
                         <p className="text-[11px] font-bold uppercase text-slate-500">Imagen evidencia</p>
                         {registro.imagenEvidenciaUrl ? (
-                          <div className="mt-2 flex h-24 w-full items-center justify-center overflow-hidden rounded-lg bg-slate-50">
-                            <img src={registro.imagenEvidenciaUrl} alt={registro.imagenEvidenciaNombre || "Imagen evidencia"} className="h-full w-full object-contain" />
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEvidenciaVisible({ url: registro.imagenEvidenciaUrl, nombre: registro.imagenEvidenciaNombre || "Imagen evidencia" })}
+                            aria-label="Ver imagen evidencia"
+                            title="Ver imagen evidencia"
+                            className="mt-2 inline-flex size-10 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm transition hover:bg-emerald-800"
+                          >
+                            <Eye className="size-5" aria-hidden="true" />
+                          </button>
                         ) : (
                           <p className="mt-1 text-sm font-semibold text-slate-950">-</p>
                         )}
@@ -868,8 +1068,8 @@ export default function VerificacionAlcoholDrogasForm() {
                 ))}
               </div>
 
-              <div className="mt-4 hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[1180px] table-fixed divide-y divide-slate-200 text-xs">
+              <div className="mt-4 hidden md:block">
+                <table className="w-full table-fixed divide-y divide-slate-200 text-xs">
                   <colgroup>
                     <col className="w-[4%]" />
                     <col className="w-[17%]" />
@@ -884,41 +1084,51 @@ export default function VerificacionAlcoholDrogasForm() {
                   </colgroup>
                   <thead className="bg-emerald-900 text-center text-white">
                     <tr>
-                      <th className="px-3 py-3 italic">N°</th>
-                      <th className="px-3 py-3 italic">Persona a la cual se le realiza la prueba</th>
-                      <th className="px-3 py-3 italic">Numero de identificación</th>
-                      <th className="px-3 py-3 italic">Empresa o contratista</th>
-                      <th className="px-3 py-3 italic">Cargo</th>
-                      <th className="px-3 py-3 italic">Resultado primera prueba inicial</th>
-                      <th className="px-3 py-3 italic">Resultado segunda prueba confirmatoria</th>
-                      <th className="px-3 py-3 italic">Imagen evidencia</th>
-                      <th className="px-3 py-3 italic">Firma</th>
-                      <th className="px-3 py-3 italic">Acción</th>
+                      <th className="px-2 py-3 italic">N°</th>
+                      <th className="px-2 py-3 italic">Persona a la cual se le realiza la prueba</th>
+                      <th className="px-2 py-3 italic">Numero de identificación</th>
+                      <th className="px-2 py-3 italic">Empresa o contratista</th>
+                      <th className="px-2 py-3 italic">Cargo</th>
+                      <th className="px-2 py-3 italic">Resultado primera prueba inicial</th>
+                      <th className="px-2 py-3 italic">Resultado segunda prueba confirmatoria</th>
+                      <th className="px-2 py-3 italic">Imagen evidencia</th>
+                      <th className="px-2 py-3 italic">Firma</th>
+                      <th className="px-2 py-3 italic">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-300 bg-slate-50 text-center text-slate-950">
                     {registros.map((registro, index) => (
                       <tr key={`${registro.empresaPersonaEvaluada}-${index}`}>
-                        <td className="border border-slate-300 px-3 py-3 font-semibold">{index + 1}</td>
-                        <td className="border border-slate-300 px-3 py-3 uppercase">{registro.personaPrueba}</td>
-                        <td className="border border-slate-300 px-3 py-3">{registro.numeroIdentificacionPersona}</td>
-                        <td className="border border-slate-300 px-3 py-3 uppercase">{registro.empresaContratistaPersona}</td>
-                        <td className="border border-slate-300 px-3 py-3 uppercase">{registro.cargoPersona}</td>
-                        <td className="border border-slate-300 px-3 py-3">
+                        <td className="border border-slate-300 px-2 py-3 font-semibold">{index + 1}</td>
+                        <td className="break-words border border-slate-300 px-2 py-3 uppercase">{registro.personaPrueba}</td>
+                        <td className="break-words border border-slate-300 px-2 py-3">{registro.numeroIdentificacionPersona}</td>
+                        <td className="break-words border border-slate-300 px-2 py-3 uppercase">{registro.empresaContratistaPersona}</td>
+                        <td className="break-words border border-slate-300 px-2 py-3 uppercase">{registro.cargoPersona}</td>
+                        <td className="border border-slate-300 px-2 py-3">
                           <div>{registro.resultadoPrimeraPruebaInicial}</div>
                           <div className="text-[11px] text-slate-600">{registro.gradoDetectado} mg / 100ml</div>
+                          <div className="text-[11px] font-semibold uppercase text-slate-950">{clasificarGradoAlcohol(registro.gradoDetectado)}</div>
                         </td>
-                        <td className="border border-slate-300 px-3 py-3">
+                        <td className="border border-slate-300 px-2 py-3">
                           <div>{registro.resultadoSegundaPruebaConfirmatoria || "-"}</div>
                           {registro.gradoDetectadoSegundaPrueba ? (
-                            <div className="text-[11px] text-slate-600">{registro.gradoDetectadoSegundaPrueba} mg / 100ml</div>
+                            <>
+                              <div className="text-[11px] text-slate-600">{registro.gradoDetectadoSegundaPrueba} mg / 100ml</div>
+                              <div className="text-[11px] font-semibold uppercase text-slate-950">{clasificarGradoAlcohol(registro.gradoDetectadoSegundaPrueba)}</div>
+                            </>
                           ) : null}
                         </td>
                         <td className="border border-slate-300 p-0">
                           {registro.imagenEvidenciaUrl ? (
-                            <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
-                              <img src={registro.imagenEvidenciaUrl} alt={registro.imagenEvidenciaNombre || "Imagen evidencia"} className="h-full w-full object-contain" />
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEvidenciaVisible({ url: registro.imagenEvidenciaUrl, nombre: registro.imagenEvidenciaNombre || "Imagen evidencia" })}
+                              aria-label="Ver imagen evidencia"
+                              title="Ver imagen evidencia"
+                              className="mx-auto my-3 grid size-9 place-items-center rounded-full bg-emerald-700 text-white shadow-sm transition hover:bg-emerald-800"
+                            >
+                              <Eye className="size-5" aria-hidden="true" />
+                            </button>
                           ) : (
                             "-"
                           )}
@@ -970,6 +1180,29 @@ export default function VerificacionAlcoholDrogasForm() {
         </div>
       </div>
 
+      {evidenciaVisible ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-2xl">
+            <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-700">Imagen evidencia</p>
+                <h3 className="mt-1 break-words text-lg font-semibold text-slate-950">{evidenciaVisible.nombre}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEvidenciaVisible(null)}
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="flex min-h-[320px] flex-1 items-center justify-center overflow-auto bg-slate-50 p-4">
+              <img src={evidenciaVisible.url} alt={evidenciaVisible.nombre} className="max-h-[72vh] w-full object-contain" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {modalFirmaAbierto ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6">
           <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-2xl">
@@ -1018,3 +1251,6 @@ export default function VerificacionAlcoholDrogasForm() {
     </div>
   );
 }
+
+
+

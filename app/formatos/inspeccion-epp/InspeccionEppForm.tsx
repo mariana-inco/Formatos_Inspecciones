@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
@@ -12,11 +12,15 @@ import {
   Flame,
   Footprints,
   Glasses,
+  Grid2X2,
   Hand,
   HardHat,
+  Eye,
+  FilePlus2,
   Minus,
   Pencil,
   PlusCircle,
+  Search,
   Shield,
   Shirt,
   Trash2,
@@ -27,7 +31,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import ProteccionDatosFormulario from "../components/ProteccionDatosFormulario";
+import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
 import type { CampoEpp, CampoEppKey, CondicionEpp } from "./data";
 
@@ -51,6 +55,68 @@ type DatosFormulario = {
 } & Record<Exclude<CampoEppKey, "otrosEpps">, CondicionEpp>;
 
 type RegistroEpp = DatosFormulario;
+
+type CondicionEppGuardada = {
+  key: string;
+  epp: string;
+  condicionId: number | null;
+};
+
+type RegistroColaboradorEppGuardado = {
+  numeroRegistro: number;
+  colaborador?: {
+    nombre?: string;
+    cargo?: string;
+  };
+  condicionesEpp?: CondicionEppGuardada[];
+  otrosEpps?: {
+    cantidad?: number;
+    detalle?: {
+      numeroRegistro: number;
+      cual: string;
+      condicionId: number | null;
+    }[];
+  };
+  observaciones?: string;
+  firmas?: {
+    firmaColaborador?: { hasFile?: boolean } | null;
+  };
+};
+
+type FormularioEppGuardado = {
+  fileName?: string;
+  registro?: {
+    fechaRegistro?: string;
+    usuarioEmail?: string;
+  };
+  datosGenerales?: {
+    fechaInspeccion?: string;
+    lugar?: string;
+    areaTrabajo?: string;
+  };
+  totalRegistros?: number;
+  registros?: RegistroColaboradorEppGuardado[];
+};
+
+type FilaRegistrosEpp = {
+  id: string;
+  archivo?: string;
+  fecha: string;
+  lugar: string;
+  areaTrabajo: string;
+  colaborador: string;
+  cargo: string;
+  estadoGeneral: "Bueno" | "Regular" | "Malo" | "N/A";
+  formulario: FormularioEppGuardado;
+  registro: RegistroColaboradorEppGuardado;
+};
+
+const perfilRocaActual = {
+  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
+  cargo: "DESARROLLADOR JUNIOR",
+  proceso: "GESTION DE TECNOLOGIA",
+  compania: "INCOMINERIA S.A.S.",
+};
 
 const datosIniciales: DatosFormulario = {
   email: "",
@@ -110,6 +176,29 @@ const etiquetaCondicion = (condicion: CondicionEpp) => {
   if (condicion === "MALO") return "Malo";
   return "N/A";
 };
+const etiquetaCondicionId = (condicionId: number | null | undefined) => {
+  if (condicionId === 1) return "Bueno";
+  if (condicionId === 2) return "Regular";
+  if (condicionId === 3) return "Malo";
+  return "N/A";
+};
+const claseEstadoRegistros = (estado: "Bueno" | "Regular" | "Malo" | "N/A") => {
+  if (estado === "Bueno") return "bg-emerald-50 text-emerald-800";
+  if (estado === "Regular") return "bg-amber-50 text-amber-800";
+  if (estado === "Malo") return "bg-red-50 text-red-700";
+  return "bg-slate-100 text-slate-600";
+};
+const calcularEstadoGeneralEpp = (condiciones: CondicionEppGuardada[] = []): "Bueno" | "Regular" | "Malo" | "N/A" => {
+  if (condiciones.some((item) => item.condicionId === 3)) return "Malo";
+  if (condiciones.some((item) => item.condicionId === 2)) return "Regular";
+  if (condiciones.some((item) => item.condicionId === 1)) return "Bueno";
+  return "N/A";
+};
+const normalizarBusqueda = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 const estiloBotonCondicion = (condicion: CondicionEpp, seleccionado: boolean) => {
   if (!seleccionado) {
     return "border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-slate-300 hover:bg-slate-50";
@@ -151,6 +240,18 @@ const estilosGrupoTabla = [
 const obtenerIconoEpp = (campo: CampoEpp) => iconosEpp[campo.key] ?? Shield;
 const obtenerEstiloGrupo = (index: number) => estilosGrupoTabla[index % estilosGrupoTabla.length];
 const obtenerCondicionRegistro = (registro: RegistroEpp, campo: CampoEpp) => registro[campo.key] as CondicionEpp;
+const camposResumenEpp = gruposTablaEpp.flatMap((grupo) => grupo.fields);
+const contarCondicionesRegistro = (registro: RegistroEpp) =>
+  camposResumenEpp.reduce(
+    (total, campo) => {
+      const condicion = obtenerCondicionRegistro(registro, campo);
+      if (condicion === "BUENO") total.buenos += 1;
+      if (condicion === "REGULAR") total.regulares += 1;
+      if (condicion === "MALO") total.malos += 1;
+      return total;
+    },
+    { buenos: 0, regulares: 0, malos: 0 }
+  );
 const EstadoBadge = ({ condicion, compacto = false }: { condicion: CondicionEpp; compacto?: boolean }) => {
   const estado =
     condicion === "BUENO"
@@ -196,7 +297,113 @@ export default function InspeccionEppForm() {
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const [cantidadOtrosAbierta, setCantidadOtrosAbierta] = useState(false);
+  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
+  const [registrosRegistros, setRegistrosRegistros] = useState<FormularioEppGuardado[]>([]);
+  const [cargandoRegistros, setCargandoRegistros] = useState(false);
+  const [busquedaRegistros, setBusquedaRegistros] = useState("");
+  const [filtroEstadoRegistros, setFiltroEstadoRegistros] = useState<"todos" | "bueno" | "regular" | "malo" | "na">("todos");
+  const [registroRegistrosSeleccionadoId, setRegistroRegistrosSeleccionadoId] = useState("");
   const referenciaFirma = useRef<SignatureRef>(null);
+
+  const cargarRegistrosRegistros = async () => {
+    setCargandoRegistros(true);
+    try {
+      const respuesta = await fetch("/api/formatos/inspeccion-epp/respuestas", { cache: "no-store" });
+      if (!respuesta.ok) throw new Error("No se pudieron consultar los registros EPP.");
+      const datosRespuesta = (await respuesta.json()) as { registros?: FormularioEppGuardado[] };
+      setRegistrosRegistros(datosRespuesta.registros || []);
+    } catch (error) {
+      console.error("Error cargando Registros EPP:", error);
+      setRegistrosRegistros([]);
+    } finally {
+      setCargandoRegistros(false);
+    }
+  };
+
+  const filasRegistros = useMemo<FilaRegistrosEpp[]>(
+    () =>
+      registrosRegistros.flatMap((formulario) =>
+        (formulario.registros || []).map((registro) => ({
+          id: `${formulario.fileName || formulario.registro?.fechaRegistro || "registro"}-${registro.numeroRegistro}`,
+          archivo: formulario.fileName,
+          fecha: formulario.datosGenerales?.fechaInspeccion || formulario.registro?.fechaRegistro?.slice(0, 10) || "",
+          lugar: formulario.datosGenerales?.lugar || "",
+          areaTrabajo: formulario.datosGenerales?.areaTrabajo || "",
+          colaborador: registro.colaborador?.nombre || "",
+          cargo: registro.colaborador?.cargo || "",
+          estadoGeneral: calcularEstadoGeneralEpp(registro.condicionesEpp || []),
+          formulario,
+          registro,
+        }))
+      ),
+    [registrosRegistros]
+  );
+
+  const filasFiltradasRegistros = useMemo(() => {
+    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
+    return filasRegistros.filter((fila) => {
+      const texto = normalizarBusqueda(
+        [
+          fila.colaborador,
+          fila.cargo,
+          fila.lugar,
+          fila.areaTrabajo,
+          fila.estadoGeneral,
+          ...(fila.registro.condicionesEpp || []).map((item) => item.epp),
+          ...(fila.registro.otrosEpps?.detalle || []).map((item) => item.cual),
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      const coincideBusqueda = !busqueda || texto.includes(busqueda);
+      const coincideEstado =
+        filtroEstadoRegistros === "todos" ||
+        (filtroEstadoRegistros === "bueno" && fila.estadoGeneral === "Bueno") ||
+        (filtroEstadoRegistros === "regular" && fila.estadoGeneral === "Regular") ||
+        (filtroEstadoRegistros === "malo" && fila.estadoGeneral === "Malo") ||
+        (filtroEstadoRegistros === "na" && fila.estadoGeneral === "N/A");
+      return coincideBusqueda && coincideEstado;
+    });
+  }, [busquedaRegistros, filasRegistros, filtroEstadoRegistros]);
+
+  const resumenRegistros = useMemo(() => {
+    const condiciones = filasFiltradasRegistros.flatMap((fila) => fila.registro.condicionesEpp || []);
+    return {
+      totalInspecciones: registrosRegistros.length,
+      totalElementos: condiciones.length,
+      buenos: condiciones.filter((item) => item.condicionId === 1).length,
+      regulares: condiciones.filter((item) => item.condicionId === 2).length,
+      malos: condiciones.filter((item) => item.condicionId === 3).length,
+    };
+  }, [filasFiltradasRegistros, registrosRegistros.length]);
+
+  const conteoPorLugarRegistros = useMemo(() => {
+    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
+      const key = fila.lugar || "Sin lugar";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
+  }, [filasFiltradasRegistros]);
+
+  const conteoPorAreaRegistros = useMemo(() => {
+    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
+      const key = fila.areaTrabajo || "Sin área";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
+  }, [filasFiltradasRegistros]);
+
+  const colaboradoresConMalosRegistros = useMemo(
+    () => filasFiltradasRegistros.filter((fila) => (fila.registro.condicionesEpp || []).some((item) => item.condicionId === 3)),
+    [filasFiltradasRegistros]
+  );
+
+  const filaSeleccionadaRegistros = useMemo(
+    () => filasRegistros.find((fila) => fila.id === registroRegistrosSeleccionadoId) || null,
+    [filasRegistros, registroRegistrosSeleccionadoId]
+  );
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -328,9 +535,11 @@ export default function InspeccionEppForm() {
       version: FORM_META.version,
       area: FORM_META.area,
     },
-    fechaRegistro: new Date().toISOString(),
+    registro: {
+      fechaRegistro: new Date().toISOString(),
+      usuarioEmail: registros[0]?.email || datos.email,
+    },
     datosGenerales: {
-      email: registros[0]?.email || datos.email,
       fechaInspeccion: registros[0]?.fechaInspeccion || datos.fechaInspeccion,
       lugar: registros[0]?.lugar || datos.lugar,
       areaTrabajo: registros[0]?.areaTrabajo || datos.areaTrabajo,
@@ -345,16 +554,19 @@ export default function InspeccionEppForm() {
       condicionesEpp: camposEpp.map((campo) => ({
         key: campo.key,
         epp: campo.label,
-        condicion: registro[campo.key] || "",
+        condicionId: mapRevisionToId(registro[campo.key] || ""),
       })),
       otrosEpps: {
-        cantidad: registro.otrosEpps || "0",
-        detalle: registro.otrosEppsDetalle,
+        cantidad: Number(registro.otrosEpps || 0),
+        detalle: registro.otrosEppsDetalle.map((otroEpp, otroIndex) => ({
+          numeroRegistro: otroIndex + 1,
+          cual: otroEpp.cual,
+          condicionId: mapRevisionToId(otroEpp.condicion),
+        })),
       },
       observaciones: registro.observaciones,
-      firma: {
-        registrada: registro.firmaRegistrada,
-        dataUrl: registro.firmaColaborador,
+      firmas: {
+        firmaColaborador: limpiarFirmaParaJson(registro.firmaColaborador, `firma-colaborador-${index + 1}`),
       },
     })),
   });
@@ -373,8 +585,7 @@ export default function InspeccionEppForm() {
 
     if (!confirm("¿Confirmas el envío del formulario HSE-F002?")) return;
     const respuestaJson = buildRespuestaJson();
-    const respuestaJsonFormateada = JSON.stringify(respuestaJson, null, 2);
-    console.log("JSON del formulario HSE-F002:", respuestaJsonFormateada);
+    registrarJsonFinalFormulario(respuestaJson);
 
     try {
       const response = await fetch("/api/formatos/inspeccion-epp/respuestas", {
@@ -387,71 +598,70 @@ export default function InspeccionEppForm() {
         throw new Error("No se pudo guardar la respuesta en JSON.");
       }
 
-      const result = (await response.json()) as { fileName: string; filePath: string };
-      console.log("Respuesta guardada en JSON:", result);
-      console.log("Registro completo del formulario:", respuestaJson);
-      localStorage.removeItem("borrador-inspeccion-epp");
+      await response.json();
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
   };
 
-  const estadoProteccion = { datos, registros, indiceEdicion };
-  const estadoInicialProteccion = {
-    datos: datosIniciales,
-    registros: [] as RegistroEpp[],
-    indiceEdicion: null as number | null,
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
-      <ProteccionDatosFormulario
-        storageKey="borrador-inspeccion-epp"
-        datos={estadoProteccion}
-        datosIniciales={estadoInicialProteccion}
-        onRestaurar={(borrador) => {
-          setDatos(borrador.datos);
-          setRegistros(borrador.registros);
-          setIndiceEdicion(borrador.indiceEdicion);
-          setFirmaTieneTrazo(false);
-          setCantidadOtrosAbierta(false);
-          referenciaFirma.current?.clear();
-        }}
-        onDescartar={() => {
-          setDatos(datosIniciales);
-          setRegistros([]);
-          setIndiceEdicion(null);
-          setFirmaTieneTrazo(false);
-          setCantidadOtrosAbierta(false);
-          referenciaFirma.current?.clear();
-        }}
-      />
       <div className="w-full max-w-full">
-        <div className="mb-6 overflow-x-auto bg-white">
-          <div className="grid min-w-[900px] grid-cols-[20%_1fr_20%] border border-slate-400 text-xs text-slate-950">
-            <div className="min-h-[112px] border-r border-slate-400 bg-white" aria-label="Espacio reservado para el logo" />
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
+          <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
+            <div>
+              <div className="flex gap-3 sm:items-start">
+                <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white shadow-sm sm:size-14">
+                  <HardHat className="size-7 sm:size-8" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <h1 className="text-xl font-bold leading-tight text-slate-950 sm:text-2xl">
+                      Inspección de elementos de protección personal
+                    </h1>
+                    <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-bold text-white">{FORM_META.codigo}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Integrado en ROCA con colaboradores firmantes y responsables de revisión.
+                  </p>
+                </div>
+              </div>
 
-            <div className="border-r border-slate-400">
-              <div className="border-b border-slate-400 py-1 text-center font-bold uppercase">{FORM_META.area}</div>
-              <div className="flex min-h-[88px] items-start justify-center px-4 pt-3 text-center font-bold uppercase">
-                {FORM_META.titulo}
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Compañía</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.compania}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Versión</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{FORM_META.version}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado</p>
+                  <p className="mt-2 text-sm font-bold text-slate-950">{registros.length > 0 ? "Listo para enviar" : "En diligenciamiento"}</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-rows-[24px_1fr_24px]">
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Codigo:</span> {FORM_META.codigo}
-              </div>
-              <div className="border-b border-slate-400 px-2 py-1">
-                <span className="font-bold italic">Fecha:</span> {FORM_META.fecha}
-              </div>
-              <div className="px-2 py-1">
-                <span className="font-bold italic">Version:</span> {FORM_META.version}
+            <div className="rounded-2xl border border-slate-200 bg-white/75 p-3 shadow-sm sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Solicitante</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.nombre}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Cargo</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.cargo}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Proceso</p>
+                  <p className="mt-2 text-sm font-bold uppercase text-slate-950">{perfilRocaActual.proceso}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <div className="border-t-2 border-blue-500 pt-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -732,137 +942,21 @@ export default function InspeccionEppForm() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-5 shadow-sm">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Resumen de EPPs calificados</h2>
               <p className="mt-1 text-sm text-slate-600">Revise los registros agregados antes de enviar el formulario.</p>
             </div>
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold uppercase text-emerald-800">
+            <span className="inline-flex w-fit items-center gap-2 rounded-md bg-emerald-50 px-4 py-2 text-xs font-bold uppercase text-emerald-800">
               <ClipboardList className="size-4" aria-hidden="true" />
               {registros.length} registro{registros.length === 1 ? "" : "s"}
             </span>
           </div>
 
-          <div className="mb-5 flex flex-wrap gap-3" aria-label="Leyenda de calificaciones">
-            <EstadoBadge condicion="BUENO" />
-            <EstadoBadge condicion="REGULAR" />
-            <EstadoBadge condicion="MALO" />
-            <EstadoBadge condicion="N/A" />
-          </div>
-
-          <div className="hidden md:block">
-            <div className="relative overflow-x-auto rounded-lg border border-slate-200 shadow-inner" role="region" aria-label="Tabla de resumen de EPPs calificados" tabIndex={0}>
-              <div className="pointer-events-none absolute right-[108px] top-0 z-20 h-full w-10 bg-gradient-to-l from-white to-transparent" aria-hidden="true" />
-              <table className="w-full min-w-[1900px] border-separate border-spacing-0 text-xs">
-                <thead className="sticky top-0 z-30 bg-emerald-900 text-white">
-                  <tr>
-                    <th rowSpan={2} scope="col" className="sticky left-0 z-40 w-[280px] min-w-[280px] border-r border-emerald-700 bg-emerald-900 px-4 py-4 text-left uppercase shadow-[8px_0_16px_-12px_rgba(15,23,42,0.7)]">
-                      Nombre y cargo del trabajador
-                    </th>
-                    {gruposTablaEpp.map((grupo, grupoIndex) => {
-                      const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
-                      return (
-                        <th key={grupo.label} colSpan={grupo.fields.length} scope="colgroup" className="border-l-2 border-l-emerald-700 border-r border-r-emerald-800 px-3 py-4 text-center uppercase">
-                          <span>{grupo.label}</span>
-                          <span className={`mx-auto mt-3 block h-1.5 w-14 rounded-full ${estiloGrupo.line}`} aria-hidden="true" />
-                        </th>
-                      );
-                    })}
-                    <th rowSpan={2} scope="col" className="w-[230px] min-w-[230px] border-l-2 border-l-emerald-700 px-3 py-4 text-center uppercase">
-                      Observaciones
-                    </th>
-                    <th rowSpan={2} scope="col" className="w-[180px] min-w-[180px] border-l border-emerald-800 px-3 py-4 text-center uppercase">
-                      Firma
-                    </th>
-                    <th rowSpan={2} scope="col" className="sticky right-0 z-40 w-[110px] min-w-[110px] border-l border-emerald-700 bg-emerald-900 px-3 py-4 text-center uppercase shadow-[-8px_0_16px_-12px_rgba(15,23,42,0.7)]">
-                      Acción
-                    </th>
-                  </tr>
-                  <tr>
-                    {gruposTablaEpp.flatMap((grupo, grupoIndex) =>
-                      grupo.fields.map((campo, campoIndex) => {
-                        const IconoCampo = obtenerIconoEpp(campo);
-                        const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
-                        const separadorGrupo = campoIndex === 0 ? `border-l-2 ${estiloGrupo.border}` : "border-l border-white/15";
-                        return (
-                          <th key={campo.key} scope="col" title={campo.label} className={`w-[95px] min-w-[95px] border-r border-white/15 px-2 py-3 text-center align-top ${separadorGrupo}`}>
-                            <span className="mx-auto flex max-w-[88px] flex-col items-center gap-2">
-                              <IconoCampo className="size-5 text-emerald-100" aria-hidden="true" />
-                              <span className="[text-wrap:balance] leading-tight normal-case">{campo.label}</span>
-                            </span>
-                          </th>
-                        );
-                      })
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="text-slate-800">
-                  {registros.length === 0 ? (
-                    <tr>
-                      <td colSpan={gruposTablaEpp.reduce((total, grupo) => total + grupo.fields.length, 0) + 4} className="px-4 py-10 text-center">
-                        <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-slate-600">
-                          <PlusCircle className="size-10 text-emerald-700" aria-hidden="true" />
-                          <p className="text-sm font-semibold">Aún no hay registros agregados.</p>
-                          <button type="button" onClick={() => enfocarCampoFaltante("nombreColaborador")} className="rounded-full bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800">
-                            Agregar el primer registro
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    registros.map((registro, index) => (
-                      <tr key={`${registro.nombreColaborador}-${index}`} className={`group transition hover:bg-emerald-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/80"}`}>
-                        <th scope="row" className={`sticky left-0 z-10 border-b border-slate-200 border-r border-slate-200 px-4 py-4 text-left align-top shadow-[8px_0_16px_-14px_rgba(15,23,42,0.7)] group-hover:bg-emerald-50 ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
-                          <div className="font-bold uppercase text-slate-950">{registro.nombreColaborador}</div>
-                          <div className="mt-1 text-sm font-semibold text-slate-600">{registro.cargoTrabajador}</div>
-                        </th>
-                        {gruposTablaEpp.flatMap((grupo, grupoIndex) =>
-                          grupo.fields.map((campo, campoIndex) => {
-                            const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
-                            const separadorGrupo = campoIndex === 0 ? `border-l-2 ${estiloGrupo.border}` : "border-l border-slate-100";
-                            return (
-                              <td key={`${index}-${campo.key}`} className={`border-b border-slate-200 border-r border-slate-100 px-2 py-4 text-center ${separadorGrupo}`}>
-                                <EstadoBadge condicion={obtenerCondicionRegistro(registro, campo)} compacto />
-                              </td>
-                            );
-                          })
-                        )}
-                        <td className="border-b border-l-2 border-l-slate-200 border-r border-slate-100 px-3 py-4 align-top text-sm">{registro.observaciones || "-"}</td>
-                        <td className="border-b border-r border-slate-100 p-0">
-                          {registro.firmaColaborador ? (
-                            <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-slate-50 px-2 py-1">
-                              <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
-                            </div>
-                          ) : (
-                            <div className="px-3 py-4 text-center text-sm text-slate-500">Pendiente</div>
-                          )}
-                        </td>
-                        <td className={`sticky right-0 z-10 border-b border-l border-slate-200 px-3 py-4 text-center shadow-[-8px_0_16px_-14px_rgba(15,23,42,0.7)] group-hover:bg-emerald-50 ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
-                          <div className="flex justify-center gap-2">
-                            <button type="button" onClick={() => handleEditarRegistro(index)} aria-label={`Editar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-emerald-100 hover:text-emerald-800">
-                              <Pencil className="size-4" aria-hidden="true" />
-                            </button>
-                            <button type="button" onClick={() => handleEliminarRegistro(index)} aria-label={`Borrar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-red-100 hover:text-red-700">
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
-              <span aria-hidden="true">{"<->"}</span>
-              Desplácese horizontalmente para ver todas las columnas
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:hidden">
+          <div className="grid gap-4">
             {registros.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center">
                 <PlusCircle className="mx-auto size-10 text-emerald-700" aria-hidden="true" />
                 <p className="mt-3 text-sm font-semibold text-slate-600">Aún no hay registros agregados.</p>
                 <button type="button" onClick={() => enfocarCampoFaltante("nombreColaborador")} className="mt-4 rounded-full bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800">
@@ -870,68 +964,104 @@ export default function InspeccionEppForm() {
                 </button>
               </div>
             ) : (
-              registros.map((registro, index) => (
-                <article key={`card-${registro.nombreColaborador}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
-                    <div>
-                      <h3 className="text-base font-bold uppercase text-slate-950">{registro.nombreColaborador}</h3>
-                      <p className="mt-1 text-sm font-semibold text-slate-600">{registro.cargoTrabajador}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => handleEditarRegistro(index)} aria-label={`Editar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-emerald-100 hover:text-emerald-800">
-                        <Pencil className="size-4" aria-hidden="true" />
-                      </button>
-                      <button type="button" onClick={() => handleEliminarRegistro(index)} aria-label={`Borrar registro de ${registro.nombreColaborador}`} className="rounded-full p-2 text-slate-600 transition hover:bg-red-100 hover:text-red-700">
-                        <Trash2 className="size-4" aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-4">
-                    {gruposTablaEpp.map((grupo, grupoIndex) => {
-                      const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
-                      return (
-                        <section key={`${registro.nombreColaborador}-${grupo.label}`} className={`rounded-lg border border-slate-200 border-l-4 ${estiloGrupo.border} bg-slate-50 p-3`}>
-                          <h4 className="text-xs font-bold uppercase text-emerald-900">{grupo.label}</h4>
-                          <div className="mt-3 grid gap-2">
-                            {grupo.fields.map((campo) => {
-                              const IconoCampo = obtenerIconoEpp(campo);
-                              return (
-                                <div key={`${registro.nombreColaborador}-${campo.key}`} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <IconoCampo className="size-4 shrink-0 text-emerald-800" aria-hidden="true" />
-                                    <span title={campo.label} className="text-xs font-bold uppercase text-slate-800 [text-wrap:balance]">
-                                      {campo.label}
-                                    </span>
-                                  </div>
-                                  <EstadoBadge condicion={obtenerCondicionRegistro(registro, campo)} />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </section>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase text-slate-700">Observaciones</p>
-                      <p className="mt-1 text-sm text-slate-700">{registro.observaciones || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase text-slate-700">Firma</p>
-                      {registro.firmaColaborador ? (
-                        <div className="mt-2 flex h-20 items-center justify-center overflow-hidden rounded-md bg-white px-2 py-1">
-                          <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
+              registros.map((registro, index) => {
+                const totales = contarCondicionesRegistro(registro);
+                return (
+                  <article key={`card-${registro.nombreColaborador}-${index}`} className="grid gap-4 lg:grid-cols-[220px_1fr]">
+                    <aside className="space-y-4">
+                      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="border-b border-slate-200 pb-3">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado global</p>
+                          <h3 className="mt-2 text-sm font-bold uppercase leading-5 text-slate-950">{registro.nombreColaborador}</h3>
+                          <p className="mt-1 text-xs font-semibold text-slate-600">{registro.cargoTrabajador}</p>
                         </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-slate-500">Pendiente</p>
-                      )}
+                        <div className="mt-3 space-y-2 text-xs font-bold">
+                          <div className="flex items-center justify-between gap-3 text-emerald-700">
+                            <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full bg-emerald-600" aria-hidden="true" />Buenos</span>
+                            <span>{totales.buenos}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-amber-700">
+                            <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full bg-amber-500" aria-hidden="true" />Regulares</span>
+                            <span>{totales.regulares}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-red-700">
+                            <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full bg-red-600" aria-hidden="true" />Malos</span>
+                            <span>{totales.malos}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Acciones rápidas</p>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => handleEditarRegistro(index)} aria-label={`Editar registro de ${registro.nombreColaborador}`} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-emerald-800 transition hover:bg-emerald-50">
+                            <Pencil className="size-4" aria-hidden="true" />
+                            Editar
+                          </button>
+                          <button type="button" onClick={() => handleEliminarRegistro(index)} aria-label={`Borrar registro de ${registro.nombreColaborador}`} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-red-700 transition hover:bg-red-50">
+                            <Trash2 className="size-4" aria-hidden="true" />
+                            Borrar
+                          </button>
+                        </div>
+                      </div>
+                    </aside>
+
+                    <div className="grid gap-4">
+                      <div className="grid gap-4">
+                        {gruposTablaEpp.map((grupo, grupoIndex) => {
+                          const estiloGrupo = obtenerEstiloGrupo(grupoIndex);
+                          return (
+                            <section key={`${registro.nombreColaborador}-${grupo.label}`} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                              <div className="flex items-center justify-between gap-3 bg-slate-100 px-4 py-3">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className={`block size-2 rounded-full ${estiloGrupo.line}`} aria-hidden="true" />
+                                  <h4 className="truncate text-xs font-bold uppercase tracking-wide text-emerald-900">{grupo.label}</h4>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-emerald-700 px-2.5 py-1 text-[10px] font-bold uppercase text-white">
+                                  {grupo.fields.length} item{grupo.fields.length === 1 ? "" : "s"}
+                                </span>
+                              </div>
+                              <div className="divide-y divide-slate-100">
+                                {grupo.fields.map((campo) => {
+                                  const IconoCampo = obtenerIconoEpp(campo);
+                                  return (
+                                    <div key={`${registro.nombreColaborador}-${campo.key}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                                      <div className="flex min-w-0 items-center gap-3">
+                                        <IconoCampo className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                                        <span title={campo.label} className="text-xs font-bold uppercase text-slate-800">
+                                          {campo.label}
+                                        </span>
+                                      </div>
+                                      <EstadoBadge condicion={obtenerCondicionRegistro(registro, campo)} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </section>
+                          );
+                        })}
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                          <p className="text-xs font-bold uppercase text-slate-500">Observaciones</p>
+                          <p className="mt-3 rounded-md bg-slate-50 px-4 py-3 text-sm font-semibold italic leading-6 text-slate-700">{registro.observaciones || "-"}</p>
+                        </div>
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                          <p className="text-xs font-bold uppercase text-slate-500">Firma de conformidad</p>
+                          {registro.firmaColaborador ? (
+                            <div className="mt-3 flex h-28 items-center justify-center overflow-hidden rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2">
+                              <img src={registro.firmaColaborador} alt="Firma registrada" className="h-full w-full object-contain contrast-200" />
+                            </div>
+                          ) : (
+                            <p className="mt-3 rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-500">Pendiente</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))
+                  </article>
+                );
+              })
             )}
           </div>
         </div>
@@ -992,3 +1122,6 @@ export default function InspeccionEppForm() {
     </div>
   );
 }
+
+
+
