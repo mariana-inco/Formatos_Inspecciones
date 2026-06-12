@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
-import { Check, ClipboardList, Eye, FilePlus2, Grid2X2, HardHat, PenLine, Search, ShieldCheck, Upload, UserCog, UsersRound, X } from "lucide-react";
+import { ClipboardList, Eye, HardHat, PenLine, ShieldCheck, Upload, UserCog, UsersRound } from "lucide-react";
+import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
 import { limpiarFirmaParaJson, limpiarImagenParaJson, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 
 const METADATOS_FORMATO = {
@@ -50,66 +51,6 @@ type DatosFormulario = {
 };
 
 type RegistroPersona = DatosFormulario;
-
-type RegistroPersonaGuardado = {
-  numeroRegistro: number;
-  personaEvaluada?: {
-    opcion?: string;
-    nombre?: string;
-    numeroIdentificacion?: string;
-    empresaContratista?: string;
-    cargo?: string;
-    resultadoPrimeraPruebaInicial?: ResultadoPrueba;
-    gradoDetectadoMg100ml?: string;
-    resultadoSegundaPruebaConfirmatoria?: ResultadoPrueba;
-    gradoDetectadoSegundaPruebaMg100ml?: string;
-    imagenEvidencia?: unknown;
-    firmas?: {
-      firmaPersonaEvaluada?: { hasFile?: boolean } | null;
-    };
-  };
-  testigo?: {
-    hayTestigo?: RespuestaSiNo;
-    nombre?: string;
-    cargo?: string;
-    confirmar?: string;
-  };
-};
-
-type FormularioAlcoholGuardado = {
-  fileName?: string;
-  registro?: {
-    fechaRegistro?: string;
-    usuarioEmail?: string;
-  };
-  datosGenerales?: {
-    centroTrabajoSede?: string;
-    tipoPrueba?: string;
-    criteriosTomaMuestra?: string;
-    equipoUtiliza?: string;
-    realizadoPor?: {
-      tipoIdentificacion?: string;
-      identificacion?: string;
-      nombre?: string;
-      cargo?: string;
-    };
-  };
-  totalRegistros?: number;
-  registros?: RegistroPersonaGuardado[];
-};
-
-type FilaRegistrosAlcohol = {
-  id: string;
-  archivo?: string;
-  fecha: string;
-  sede: string;
-  evaluador: string;
-  criterio: string;
-  testigo: string;
-  resultado: "Negativo" | "Positivo";
-  formulario: FormularioAlcoholGuardado;
-  registro: RegistroPersonaGuardado;
-};
 
 const perfilRocaActual = {
   nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
@@ -159,22 +100,8 @@ const marcaObligatorio = <span className="text-red-600">*</span>;
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const soloDecimal = (value: string) => value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
-const normalizarBusqueda = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-const obtenerResultadoRegistros = (registro: RegistroPersonaGuardado): "Negativo" | "Positivo" => {
-  const primera = registro.personaEvaluada?.resultadoPrimeraPruebaInicial;
-  const segunda = registro.personaEvaluada?.resultadoSegundaPruebaConfirmatoria;
-  return primera === "POSITIVO" || segunda === "POSITIVO" ? "Positivo" : "Negativo";
-};
-const claseResultadoRegistros = (resultado: "Negativo" | "Positivo") =>
-  resultado === "Positivo" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800";
 const enfocarCampoFaltante = (id: string) => {
-  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
-  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
-  campo?.focus({ preventScroll: true });
+  enfocarYMostrarCampoFaltante(id);
 };
 const camposSinNumeros = new Set<keyof DatosFormulario>([
   "nombreRealizaPrueba",
@@ -218,107 +145,7 @@ export default function VerificacionAlcoholDrogasForm() {
   const [evidenciaVisible, setEvidenciaVisible] = useState<{ url: string; nombre: string } | null>(null);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const [imagenInputKey, setImagenInputKey] = useState(0);
-  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
-  const [registrosRegistros, setRegistrosRegistros] = useState<FormularioAlcoholGuardado[]>([]);
-  const [cargandoRegistros, setCargandoRegistros] = useState(false);
-  const [busquedaRegistros, setBusquedaRegistros] = useState("");
-  const [filtroResultadoRegistros, setFiltroResultadoRegistros] = useState<"todos" | "negativo" | "positivo">("todos");
-  const [registroRegistrosSeleccionadoId, setRegistroRegistrosSeleccionadoId] = useState("");
   const referenciaFirma = useRef<SignatureRef>(null);
-
-  const cargarRegistrosRegistros = async () => {
-    setCargandoRegistros(true);
-    try {
-      const respuesta = await fetch("/api/formatos/verificacion-alcohol-drogas/respuestas", { cache: "no-store" });
-      if (!respuesta.ok) throw new Error("No se pudieron consultar los registros.");
-      const datosRespuesta = (await respuesta.json()) as { registros?: FormularioAlcoholGuardado[] };
-      setRegistrosRegistros(datosRespuesta.registros || []);
-    } catch (error) {
-      console.error("Error cargando Registros alcohol y drogas:", error);
-      setRegistrosRegistros([]);
-    } finally {
-      setCargandoRegistros(false);
-    }
-  };
-
-  const filasRegistros = useMemo<FilaRegistrosAlcohol[]>(
-    () =>
-      registrosRegistros.flatMap((formulario) =>
-        (formulario.registros || []).map((registro) => ({
-          id: `${formulario.fileName || formulario.registro?.fechaRegistro || "registro"}-${registro.numeroRegistro}`,
-          archivo: formulario.fileName,
-          fecha: formulario.registro?.fechaRegistro?.slice(0, 10) || "",
-          sede: formulario.datosGenerales?.centroTrabajoSede || "",
-          evaluador: formulario.datosGenerales?.realizadoPor?.nombre || "",
-          criterio: formulario.datosGenerales?.criteriosTomaMuestra || "",
-          testigo: registro.testigo?.hayTestigo === "SI" ? registro.testigo?.nombre || "SI" : "NO",
-          resultado: obtenerResultadoRegistros(registro),
-          formulario,
-          registro,
-        }))
-      ),
-    [registrosRegistros]
-  );
-
-  const filasFiltradasRegistros = useMemo(() => {
-    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
-    return filasRegistros.filter((fila) => {
-      const texto = normalizarBusqueda([
-        fila.sede,
-        fila.evaluador,
-        fila.registro.personaEvaluada?.nombre,
-        fila.criterio,
-      ].filter(Boolean).join(" "));
-      const coincideBusqueda = !busqueda || texto.includes(busqueda);
-      const coincideResultado =
-        filtroResultadoRegistros === "todos" ||
-        (filtroResultadoRegistros === "negativo" && fila.resultado === "Negativo") ||
-        (filtroResultadoRegistros === "positivo" && fila.resultado === "Positivo");
-      return coincideBusqueda && coincideResultado;
-    });
-  }, [busquedaRegistros, filasRegistros, filtroResultadoRegistros]);
-
-  const resumenRegistros = useMemo(
-    () => ({
-      total: filasFiltradasRegistros.length,
-      negativos: filasFiltradasRegistros.filter((fila) => fila.resultado === "Negativo").length,
-      positivos: filasFiltradasRegistros.filter((fila) => fila.resultado === "Positivo").length,
-      conTestigo: filasFiltradasRegistros.filter((fila) => fila.registro.testigo?.hayTestigo === "SI").length,
-    }),
-    [filasFiltradasRegistros]
-  );
-
-  const conteoPorSedeRegistros = useMemo(() => {
-    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
-      const key = fila.sede || "Sin sede";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
-  }, [filasFiltradasRegistros]);
-
-  const conteoPorMuestraRegistros = useMemo(() => {
-    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
-      const key = fila.criterio || "Sin criterio";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
-  }, [filasFiltradasRegistros]);
-
-  const conteoPorFechaRegistros = useMemo(() => {
-    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
-      const key = fila.fecha || "Sin fecha";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo).sort(([a], [b]) => b.localeCompare(a)).map(([label, value]) => ({ label, value }));
-  }, [filasFiltradasRegistros]);
-
-  const filaSeleccionadaRegistros = useMemo(
-    () => filasRegistros.find((fila) => fila.id === registroRegistrosSeleccionadoId) || null,
-    [filasRegistros, registroRegistrosSeleccionadoId]
-  );
 
   const manejarCambio = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

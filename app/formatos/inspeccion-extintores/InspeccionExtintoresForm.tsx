@@ -1,24 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import {
-  CalendarDays,
-  Check,
-  ClipboardList,
-  Clock3,
-  Eye,
-  FilePlus2,
   FireExtinguisher,
-  Grid2X2,
   PenLine,
-  Search,
-  TriangleAlert,
   UserCog,
-  XCircle,
 } from "lucide-react";
+import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
 import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 
 const METADATOS_FORMATO = {
@@ -70,64 +61,6 @@ type RegistroExtintor = {
   manija: EstadoRevision;
   corrosion: EstadoRevision;
   observaciones: string;
-};
-
-type VerificacionExtintorGuardada = {
-  key: string;
-  criterio: string;
-  estadoId: number | null;
-};
-
-type ExtintorGuardado = {
-  numeroRegistro?: number;
-  identificacionExtintor?: {
-    numeroExtintor?: string;
-    capacidad?: string;
-    agente?: string;
-    clase?: string;
-    ubicacion?: string;
-    fechaUltimaRecarga?: string;
-    fechaProximaRecarga?: string;
-  };
-  verificacion?: VerificacionExtintorGuardada[];
-  observaciones?: string;
-};
-
-type RegistroExtintoresGuardado = {
-  fileName?: string;
-  registro?: {
-    fechaRegistro?: string;
-    usuarioEmail?: string;
-  };
-  datosInspeccion?: {
-    sedeCentroTrabajo?: string;
-    responsableInspeccion?: string;
-    cargoResponsable?: string;
-    equipoInterno?: string;
-    equipoExterno?: string;
-  };
-  registros?: ExtintorGuardado[];
-};
-
-type EstadoFiltroRegistros = "todos" | "bueno" | "regular" | "malo" | "recarga-vencida" | "proximo-recarga";
-
-type FilaRegistrosExtintor = {
-  id: string;
-  codigo: string;
-  archivo: string;
-  fecha: string;
-  sede: string;
-  responsable: string;
-  numeroExtintor: string;
-  ubicacion: string;
-  capacidad: string;
-  agente: string;
-  clase: string;
-  estado: "Bueno" | "Regular" | "Malo";
-  estadoRecarga: "Vigente" | "Recarga vencida" | "Próximo a recarga";
-  proximaRecarga: string;
-  registroPadre: RegistroExtintoresGuardado;
-  extintor: ExtintorGuardado;
 };
 
 const datosInspeccionIniciales: DatosInspeccion = {
@@ -214,15 +147,8 @@ const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const mostrarValor = (value: string) => value || "N/A";
 const mostrarEstado = (value: EstadoRevision) => (value === "NO APLICA" || !value ? "N/A" : value);
-const normalizarBusqueda = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
 const enfocarCampoFaltante = (id: string) => {
-  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
-  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
-  campo?.focus({ preventScroll: true });
+  enfocarYMostrarCampoFaltante(id);
 };
 const claseEstadoComponente = (value: EstadoRevision) => {
   if (value === "BUENO") return "bg-emerald-500 text-white";
@@ -233,42 +159,6 @@ const claseEstadoComponente = (value: EstadoRevision) => {
 const etiquetaEstadoRevision = (value: EstadoRevision) => (value === "NO APLICA" ? "N/A" : value);
 const opcionesRevisionVisibles = (estadoSeleccionado: EstadoRevision) =>
   estadoSeleccionado ? [estadoSeleccionado] : opcionesRevision;
-const etiquetaRevisionId = (estadoId?: number | null) => {
-  if (estadoId === 1) return "Bueno";
-  if (estadoId === 2) return "Regular";
-  if (estadoId === 3) return "Malo";
-  return "N/A";
-};
-const obtenerEstadoExtintor = (verificacion: VerificacionExtintorGuardada[] = []): "Bueno" | "Regular" | "Malo" => {
-  if (verificacion.some((item) => item.estadoId === 3)) return "Malo";
-  if (verificacion.some((item) => item.estadoId === 2)) return "Regular";
-  return "Bueno";
-};
-const obtenerEstadoRecarga = (fechaProximaRecarga?: string): "Vigente" | "Recarga vencida" | "Próximo a recarga" => {
-  if (!fechaProximaRecarga) return "Vigente";
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const fecha = new Date(`${fechaProximaRecarga}T00:00:00`);
-  if (Number.isNaN(fecha.getTime())) return "Vigente";
-  const diasRestantes = Math.ceil((fecha.getTime() - hoy.getTime()) / 86400000);
-  if (diasRestantes < 0) return "Recarga vencida";
-  if (diasRestantes <= 30) return "Próximo a recarga";
-  return "Vigente";
-};
-const obtenerConteoRegistros = (filas: FilaRegistrosExtintor[], campo: "sede" | "ubicacion") =>
-  Object.entries(
-    filas.reduce<Record<string, number>>((acc, fila) => {
-      const label = fila[campo] || "Sin dato";
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {})
-  ).map(([label, value]) => ({ label, value }));
-const claseEstadoRegistros = (estado: string) => {
-  if (estado === "Bueno" || estado === "Vigente") return "bg-emerald-100 text-emerald-800";
-  if (estado === "Regular" || estado === "Próximo a recarga") return "bg-amber-100 text-amber-800";
-  if (estado === "Malo" || estado === "Recarga vencida") return "bg-red-100 text-red-800";
-  return "bg-slate-100 text-slate-700";
-};
 const claseBotonRevision = (value: EstadoRevision, seleccionado: boolean) => {
   if (!seleccionado) return "border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50";
   if (value === "BUENO") return "border border-emerald-300 bg-emerald-100 text-emerald-800 shadow-sm";
@@ -298,97 +188,7 @@ export default function InspeccionExtintoresForm() {
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
-  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
-  const [registrosRegistros, setRegistrosRegistros] = useState<RegistroExtintoresGuardado[]>([]);
-  const [cargandoRegistros, setCargandoRegistros] = useState(false);
-  const [busquedaRegistros, setBusquedaRegistros] = useState("");
-  const [filtroEstadoRegistros, setFiltroEstadoRegistros] = useState<EstadoFiltroRegistros>("todos");
-  const [filaSeleccionadaRegistros, setFilaSeleccionadaRegistros] = useState<FilaRegistrosExtintor | null>(null);
   const referenciaFirma = useRef<SignatureRef>(null);
-
-  const cargarRegistrosRegistros = async () => {
-    setCargandoRegistros(true);
-    try {
-      const respuesta = await fetch("/api/formatos/inspeccion-extintores/respuestas", { cache: "no-store" });
-      if (!respuesta.ok) throw new Error("No se pudieron consultar las respuestas.");
-      const datos = (await respuesta.json()) as { registros?: RegistroExtintoresGuardado[] };
-      setRegistrosRegistros(datos.registros || []);
-    } catch (error) {
-      console.error("Error cargando Registros de extintores:", error);
-      setRegistrosRegistros([]);
-    } finally {
-      setCargandoRegistros(false);
-    }
-  };
-
-  const filasRegistros = useMemo<FilaRegistrosExtintor[]>(() => {
-    return registrosRegistros.flatMap((registroGuardado) =>
-      (registroGuardado.registros || []).map((extintor, index) => {
-        const identificacion = extintor.identificacionExtintor || {};
-        const estado = obtenerEstadoExtintor(extintor.verificacion || []);
-        const proximaRecarga = identificacion.fechaProximaRecarga || "";
-        return {
-          id: `${registroGuardado.fileName || "registro"}-${extintor.numeroRegistro || index + 1}`,
-          codigo: METADATOS_FORMATO.codigo,
-          archivo: registroGuardado.fileName || "-",
-          fecha: registroGuardado.registro?.fechaRegistro?.slice(0, 10) || "-",
-          sede: registroGuardado.datosInspeccion?.sedeCentroTrabajo || "-",
-          responsable: registroGuardado.datosInspeccion?.responsableInspeccion || "-",
-          numeroExtintor: identificacion.numeroExtintor || "-",
-          ubicacion: identificacion.ubicacion || "-",
-          capacidad: identificacion.capacidad || "-",
-          agente: identificacion.agente || "-",
-          clase: identificacion.clase || "-",
-          estado,
-          estadoRecarga: obtenerEstadoRecarga(proximaRecarga),
-          proximaRecarga: proximaRecarga || "-",
-          registroPadre: registroGuardado,
-          extintor,
-        };
-      })
-    );
-  }, [registrosRegistros]);
-
-  const filasFiltradasRegistros = useMemo(() => {
-    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
-    return filasRegistros.filter((fila) => {
-      const textoBusqueda = normalizarBusqueda(
-        [
-          fila.responsable,
-          fila.sede,
-          fila.numeroExtintor,
-          fila.ubicacion,
-          fila.capacidad,
-          fila.agente,
-          fila.clase,
-          fila.archivo,
-        ].join(" ")
-      );
-      const coincideBusqueda = !busqueda || textoBusqueda.includes(busqueda);
-      const coincideEstado =
-        filtroEstadoRegistros === "todos" ||
-        (filtroEstadoRegistros === "bueno" && fila.estado === "Bueno") ||
-        (filtroEstadoRegistros === "regular" && fila.estado === "Regular") ||
-        (filtroEstadoRegistros === "malo" && fila.estado === "Malo") ||
-        (filtroEstadoRegistros === "recarga-vencida" && fila.estadoRecarga === "Recarga vencida") ||
-        (filtroEstadoRegistros === "proximo-recarga" && fila.estadoRecarga === "Próximo a recarga");
-      return coincideBusqueda && coincideEstado;
-    });
-  }, [busquedaRegistros, filasRegistros, filtroEstadoRegistros]);
-
-  const resumenRegistros = useMemo(
-    () => ({
-      total: filasFiltradasRegistros.length,
-      buenos: filasFiltradasRegistros.filter((fila) => fila.estado === "Bueno").length,
-      regulares: filasFiltradasRegistros.filter((fila) => fila.estado === "Regular").length,
-      malos: filasFiltradasRegistros.filter((fila) => fila.estado === "Malo").length,
-      recargaVencida: filasFiltradasRegistros.filter((fila) => fila.estadoRecarga === "Recarga vencida").length,
-      proximaRecarga: filasFiltradasRegistros.filter((fila) => fila.estadoRecarga === "Próximo a recarga").length,
-    }),
-    [filasFiltradasRegistros]
-  );
-  const inspeccionesPorSedeRegistros = useMemo(() => obtenerConteoRegistros(filasFiltradasRegistros, "sede"), [filasFiltradasRegistros]);
-  const extintoresPorUbicacionRegistros = useMemo(() => obtenerConteoRegistros(filasFiltradasRegistros, "ubicacion"), [filasFiltradasRegistros]);
 
   const manejarCambioDatosInspeccion = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

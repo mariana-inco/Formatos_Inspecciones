@@ -7,29 +7,15 @@ import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import {
-  AlertTriangle,
-  BarChart3,
   CalendarDays,
-  Camera,
   Check,
   ClipboardList,
-  Clock3,
-  Eye,
-  FileCheck2,
-  FilePlus2,
-  FileWarning,
-  Grid2X2,
   HardHat,
   ImageUp,
-  List,
-  PenLine,
-  Search,
   Settings,
   ShieldCheck,
-  UserCheck,
-  Wrench,
-  XCircle,
 } from "lucide-react";
+import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
 import {
   limpiarFirmaParaJson,
   limpiarImagenParaJson,
@@ -104,42 +90,6 @@ type DatosFirma = {
   responsableFirmado: boolean;
 };
 
-type RespuestaChecklistGuardada = {
-  key: string;
-  factor: string;
-  instrucciones: string | string[];
-  conceptoId: number | null;
-  comentario: string;
-};
-
-type RegistroContraCaidasGuardado = {
-  fileName?: string;
-  registro?: {
-    fechaRegistro?: string;
-    usuarioEmail?: string;
-  };
-  inspeccion?: {
-    tipo?: string;
-    nombre?: string;
-  };
-  datosEquipo?: Record<string, string> & {
-    imagenEquipo?: {
-      fileName?: string;
-      hasFile?: boolean;
-      fileUrl?: string;
-    } | null;
-  };
-  respuestasChecklist?: RespuestaChecklistGuardada[];
-  cierreInspeccion?: {
-    comentariosFinales?: string;
-    decisionFinalId?: number | null;
-  };
-  firmas?: {
-    firmaInspector?: { hasFile?: boolean } | null;
-    firmaResponsable?: { hasFile?: boolean } | null;
-  };
-};
-
 const firmasIniciales: DatosFirma = {
   inspectorIdentificacion: "",
   inspectorNombre: "",
@@ -156,9 +106,7 @@ const firmasIniciales: DatosFirma = {
 const soloNumeros = (value: string) => value.replace(/\D/g, "");
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const enfocarCampoFaltante = (id: string) => {
-  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
-  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
-  campo?.focus({ preventScroll: true });
+  enfocarYMostrarCampoFaltante(id);
 };
 const camposFirmaNumericos = new Set<keyof DatosFirma>(["inspectorIdentificacion", "responsableIdentificacion"]);
 const camposFirmaSinNumeros = new Set<keyof DatosFirma>([
@@ -227,9 +175,6 @@ const obtenerEstadoVigencia = (proximaInspeccion: string) => {
   return "Vigente";
 };
 const mostrarFecha = (fecha: string) => fecha || "-";
-const obtenerRegistroRegistrosId = (registro: RegistroContraCaidasGuardado) =>
-  registro.fileName || registro.registro?.fechaRegistro || `${registro.registro?.usuarioEmail || "registro"}-${registro.inspeccion?.tipo || ""}`;
-
 export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [datosGenerales, setDatosGenerales] = useState(datosGeneralesIniciales);
   const [urlVistaPreviaImagen, setUrlVistaPreviaImagen] = useState("");
@@ -246,27 +191,6 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
   const [firmas, setFirmas] = useState<DatosFirma>(firmasIniciales);
-  const [busquedaRegistros, setBusquedaRegistros] = useState("");
-  const [filtroConceptoRegistros, setFiltroConceptoRegistros] = useState<"todos" | "pendiente" | "aceptado" | "rechazado">("todos");
-  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
-  const [registrosRegistros, setRegistrosRegistros] = useState<RegistroContraCaidasGuardado[]>([]);
-  const [cargandoRegistros, setCargandoRegistros] = useState(false);
-  const [registroRegistrosSeleccionadoId, setRegistroRegistrosSeleccionadoId] = useState("");
-
-  const cargarRegistrosRegistros = async () => {
-    setCargandoRegistros(true);
-    try {
-      const respuesta = await fetch("/api/formatos/inspeccion-contra-caidas/respuestas", { cache: "no-store" });
-      if (!respuesta.ok) throw new Error("No se pudieron consultar los registros.");
-      const datos = (await respuesta.json()) as { registros?: RegistroContraCaidasGuardado[] };
-      setRegistrosRegistros(datos.registros || []);
-    } catch (error) {
-      console.error("Error cargando registros del Registros:", error);
-      setRegistrosRegistros([]);
-    } finally {
-      setCargandoRegistros(false);
-    }
-  };
 
   const listaChequeoActual = useMemo(() => tiposInspeccion[tipoInspeccionSeleccionado].checklist || [], [tipoInspeccionSeleccionado]);
   const esInspeccionArnes = tipoInspeccionSeleccionado === "arnes";
@@ -317,100 +241,6 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
       firmasCompletas: firmas.inspectorFirmado && firmas.responsableFirmado,
     };
   }, [firmas.inspectorFirmado, firmas.responsableFirmado, listaChequeoActual, respuestasListaChequeo]);
-  const filasRegistros = useMemo(() => {
-    const busqueda = busquedaRegistros.trim().toLowerCase();
-    return listaChequeoActual.filter((item) => {
-      const respuesta = respuestasListaChequeo[item.key];
-      const concepto = respuesta?.concepto || "";
-      const instrucciones = Array.isArray(item.instrucciones) ? item.instrucciones.join(" ") : item.instrucciones;
-      const coincideBusqueda = !busqueda || `${item.factor} ${instrucciones} ${respuesta?.comentario || ""}`.toLowerCase().includes(busqueda);
-      const coincideConcepto =
-        filtroConceptoRegistros === "todos" ||
-        (filtroConceptoRegistros === "pendiente" && !concepto) ||
-        (filtroConceptoRegistros === "aceptado" && concepto === "ACEPTADO") ||
-        (filtroConceptoRegistros === "rechazado" && concepto === "RECHAZADO");
-      return coincideBusqueda && coincideConcepto;
-    });
-  }, [busquedaRegistros, filtroConceptoRegistros, listaChequeoActual, respuestasListaChequeo]);
-  const registrosFiltradosRegistros = useMemo(() => {
-    const busqueda = busquedaRegistros.trim().toLowerCase();
-    return registrosRegistros.filter((registro) => {
-      const datosEquipo = registro.datosEquipo || {};
-      const textoBusqueda = [
-        registro.fileName,
-        registro.inspeccion?.nombre,
-        registro.registro?.usuarioEmail,
-        datosEquipo.fabricante,
-        datosEquipo.modelo,
-        datosEquipo.numeroSerie,
-        datosEquipo.numeroInterno,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const decisionId = registro.cierreInspeccion?.decisionFinalId;
-      const coincideBusqueda = !busqueda || textoBusqueda.includes(busqueda);
-      const coincideConcepto =
-        filtroConceptoRegistros === "todos" ||
-        (filtroConceptoRegistros === "pendiente" && !decisionId) ||
-        (filtroConceptoRegistros === "aceptado" && decisionId === 1) ||
-        (filtroConceptoRegistros === "rechazado" && decisionId === 2);
-      return coincideBusqueda && coincideConcepto;
-    });
-  }, [busquedaRegistros, filtroConceptoRegistros, registrosRegistros]);
-  const resumenRegistrosRegistros = useMemo(() => {
-    const total = registrosFiltradosRegistros.length;
-    const aprobados = registrosFiltradosRegistros.filter((registro) => registro.cierreInspeccion?.decisionFinalId === 1).length;
-    const rechazados = registrosFiltradosRegistros.filter((registro) => registro.cierreInspeccion?.decisionFinalId === 2).length;
-    const pendientes = registrosFiltradosRegistros.filter((registro) => !registro.cierreInspeccion?.decisionFinalId).length;
-    const factores = registrosFiltradosRegistros.flatMap((registro) => registro.respuestasChecklist || []);
-    const factoresAceptados = factores.filter((item) => item.conceptoId === 1).length;
-    const factoresRechazados = factores.filter((item) => item.conceptoId === 2).length;
-    const factoresPendientes = factores.filter((item) => !item.conceptoId).length;
-    const totalFactoresEvaluados = factoresAceptados + factoresRechazados;
-    const porcentajeRechazo = totalFactoresEvaluados > 0 ? Math.round((factoresRechazados / totalFactoresEvaluados) * 100) : 0;
-    const registrosIncompletos = registrosFiltradosRegistros.filter((registro) => {
-      const tieneDecision = Boolean(registro.cierreInspeccion?.decisionFinalId);
-      const tieneFirmas = Boolean(registro.firmas?.firmaInspector?.hasFile && registro.firmas?.firmaResponsable?.hasFile);
-      return !tieneDecision || !tieneFirmas;
-    }).length;
-
-    return {
-      total,
-      aprobados,
-      rechazados,
-      pendientes,
-      factoresAceptados,
-      factoresRechazados,
-      factoresPendientes,
-      totalFactores: factores.length,
-      porcentajeRechazo,
-      registrosIncompletos,
-    };
-  }, [registrosFiltradosRegistros]);
-  const inspeccionesPorTipoRegistros = useMemo(() => {
-    const conteo = registrosFiltradosRegistros.reduce<Record<string, number>>((acc, registro) => {
-      const tipo = registro.inspeccion?.nombre || "Sin tipo";
-      acc[tipo] = (acc[tipo] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
-  }, [registrosFiltradosRegistros]);
-  const inspeccionesPorFechaRegistros = useMemo(() => {
-    const conteo = registrosFiltradosRegistros.reduce<Record<string, number>>((acc, registro) => {
-      const fecha = registro.datosEquipo?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "Sin fecha";
-      acc[fecha] = (acc[fecha] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo)
-      .sort(([fechaA], [fechaB]) => fechaB.localeCompare(fechaA))
-      .map(([label, value]) => ({ label, value }));
-  }, [registrosFiltradosRegistros]);
-  const ultimoRegistroRegistros = registrosFiltradosRegistros[0] || registrosRegistros[0];
-  const registroRegistrosSeleccionado = useMemo(
-    () => registrosRegistros.find((registro) => obtenerRegistroRegistrosId(registro) === registroRegistrosSeleccionadoId) || null,
-    [registroRegistrosSeleccionadoId, registrosRegistros]
-  );
   const analiticaRegistros = useMemo(() => {
     const proximaInspeccion = calcularProximaInspeccion(datosGenerales.fechaInspeccion, datosGenerales.periodicidad);
     const estadoVigencia = obtenerEstadoVigencia(proximaInspeccion);
@@ -558,11 +388,6 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     }));
   };
 
-  const verFactorDesdeRegistros = (key: string) => {
-    setVistaActiva("formulario");
-    window.setTimeout(() => enfocarCampoFaltante(`concepto-${key}`), 0);
-  };
-
   const seleccionarTipoInspeccion = (tipo: ClaveTipoInspeccion) => {
     setTipoInspeccionSeleccionado(tipo);
     setRespuestasListaChequeo({});
@@ -626,9 +451,6 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     setFirmas(firmasIniciales);
     setFirmaTieneTrazo(false);
     setRolModalFirma(null);
-    setBusquedaRegistros("");
-    setFiltroConceptoRegistros("todos");
-    setVistaActiva("formulario");
     referenciaFirma.current?.clear();
   };
 

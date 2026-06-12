@@ -117,5 +117,5 @@ export const limpiarFirmaParaJson = (dataUrl: string, prefijo: string) =>
   });
 
 export const registrarJsonFinalFormulario = (registroFinal: unknown) => {
-  console.log("Registro final del formulario:", registroFinal);
+  void registroFinal;
 };

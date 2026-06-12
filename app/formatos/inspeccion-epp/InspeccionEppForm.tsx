@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
@@ -12,15 +12,11 @@ import {
   Flame,
   Footprints,
   Glasses,
-  Grid2X2,
   Hand,
   HardHat,
-  Eye,
-  FilePlus2,
   Minus,
   Pencil,
   PlusCircle,
-  Search,
   Shield,
   Shirt,
   Trash2,
@@ -31,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
 import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
 import type { CampoEpp, CampoEppKey, CondicionEpp } from "./data";
@@ -55,61 +52,6 @@ type DatosFormulario = {
 } & Record<Exclude<CampoEppKey, "otrosEpps">, CondicionEpp>;
 
 type RegistroEpp = DatosFormulario;
-
-type CondicionEppGuardada = {
-  key: string;
-  epp: string;
-  condicionId: number | null;
-};
-
-type RegistroColaboradorEppGuardado = {
-  numeroRegistro: number;
-  colaborador?: {
-    nombre?: string;
-    cargo?: string;
-  };
-  condicionesEpp?: CondicionEppGuardada[];
-  otrosEpps?: {
-    cantidad?: number;
-    detalle?: {
-      numeroRegistro: number;
-      cual: string;
-      condicionId: number | null;
-    }[];
-  };
-  observaciones?: string;
-  firmas?: {
-    firmaColaborador?: { hasFile?: boolean } | null;
-  };
-};
-
-type FormularioEppGuardado = {
-  fileName?: string;
-  registro?: {
-    fechaRegistro?: string;
-    usuarioEmail?: string;
-  };
-  datosGenerales?: {
-    fechaInspeccion?: string;
-    lugar?: string;
-    areaTrabajo?: string;
-  };
-  totalRegistros?: number;
-  registros?: RegistroColaboradorEppGuardado[];
-};
-
-type FilaRegistrosEpp = {
-  id: string;
-  archivo?: string;
-  fecha: string;
-  lugar: string;
-  areaTrabajo: string;
-  colaborador: string;
-  cargo: string;
-  estadoGeneral: "Bueno" | "Regular" | "Malo" | "N/A";
-  formulario: FormularioEppGuardado;
-  registro: RegistroColaboradorEppGuardado;
-};
 
 const perfilRocaActual = {
   nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
@@ -154,22 +96,15 @@ const dateInputClassName =
   "date-input mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const fieldClassName =
   "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const selectClassName =
-  "mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
 const encabezadoSeccion = "flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
 const iconoSeccion = "grid size-12 shrink-0 place-items-center rounded-xl bg-emerald-900 text-white";
 const requiredMark = <span className="text-red-600">*</span>;
 const quitarNumeros = (value: string) => value.replace(/[0-9]/g, "");
 const camposSinNumeros = new Set<keyof DatosFormulario>(["nombreColaborador", "cargoTrabajador"]);
-const opcionesCantidadOtrosEpps = Array.from({ length: 9 }, (_, index) => String(index + 1));
 const enfocarCampoFaltante = (id: string) => {
-  const campo = document.querySelector<HTMLElement>(`[name="${id}"], [data-required-id="${id}"]`);
-  campo?.scrollIntoView({ behavior: "smooth", block: "center" });
-  campo?.focus({ preventScroll: true });
+  enfocarYMostrarCampoFaltante(id);
 };
-const crearDetalleOtrosEpps = (cantidad: number, detalleActual: OtroEpp[] = []) =>
-  Array.from({ length: cantidad }, (_, index) => detalleActual[index] ?? { cual: "", condicion: "" });
 const etiquetaCondicion = (condicion: CondicionEpp) => {
   if (condicion === "BUENO") return "Bueno";
   if (condicion === "REGULAR") return "Regular";
@@ -182,23 +117,6 @@ const etiquetaCondicionId = (condicionId: number | null | undefined) => {
   if (condicionId === 3) return "Malo";
   return "N/A";
 };
-const claseEstadoRegistros = (estado: "Bueno" | "Regular" | "Malo" | "N/A") => {
-  if (estado === "Bueno") return "bg-emerald-50 text-emerald-800";
-  if (estado === "Regular") return "bg-amber-50 text-amber-800";
-  if (estado === "Malo") return "bg-red-50 text-red-700";
-  return "bg-slate-100 text-slate-600";
-};
-const calcularEstadoGeneralEpp = (condiciones: CondicionEppGuardada[] = []): "Bueno" | "Regular" | "Malo" | "N/A" => {
-  if (condiciones.some((item) => item.condicionId === 3)) return "Malo";
-  if (condiciones.some((item) => item.condicionId === 2)) return "Regular";
-  if (condiciones.some((item) => item.condicionId === 1)) return "Bueno";
-  return "N/A";
-};
-const normalizarBusqueda = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
 const estiloBotonCondicion = (condicion: CondicionEpp, seleccionado: boolean) => {
   if (!seleccionado) {
     return "border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-slate-300 hover:bg-slate-50";
@@ -296,129 +214,12 @@ export default function InspeccionEppForm() {
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
-  const [cantidadOtrosAbierta, setCantidadOtrosAbierta] = useState(false);
-  const [vistaActiva, setVistaActiva] = useState<"formulario" | "listado">("formulario");
-  const [registrosRegistros, setRegistrosRegistros] = useState<FormularioEppGuardado[]>([]);
-  const [cargandoRegistros, setCargandoRegistros] = useState(false);
-  const [busquedaRegistros, setBusquedaRegistros] = useState("");
-  const [filtroEstadoRegistros, setFiltroEstadoRegistros] = useState<"todos" | "bueno" | "regular" | "malo" | "na">("todos");
-  const [registroRegistrosSeleccionadoId, setRegistroRegistrosSeleccionadoId] = useState("");
   const referenciaFirma = useRef<SignatureRef>(null);
-
-  const cargarRegistrosRegistros = async () => {
-    setCargandoRegistros(true);
-    try {
-      const respuesta = await fetch("/api/formatos/inspeccion-epp/respuestas", { cache: "no-store" });
-      if (!respuesta.ok) throw new Error("No se pudieron consultar los registros EPP.");
-      const datosRespuesta = (await respuesta.json()) as { registros?: FormularioEppGuardado[] };
-      setRegistrosRegistros(datosRespuesta.registros || []);
-    } catch (error) {
-      console.error("Error cargando Registros EPP:", error);
-      setRegistrosRegistros([]);
-    } finally {
-      setCargandoRegistros(false);
-    }
-  };
-
-  const filasRegistros = useMemo<FilaRegistrosEpp[]>(
-    () =>
-      registrosRegistros.flatMap((formulario) =>
-        (formulario.registros || []).map((registro) => ({
-          id: `${formulario.fileName || formulario.registro?.fechaRegistro || "registro"}-${registro.numeroRegistro}`,
-          archivo: formulario.fileName,
-          fecha: formulario.datosGenerales?.fechaInspeccion || formulario.registro?.fechaRegistro?.slice(0, 10) || "",
-          lugar: formulario.datosGenerales?.lugar || "",
-          areaTrabajo: formulario.datosGenerales?.areaTrabajo || "",
-          colaborador: registro.colaborador?.nombre || "",
-          cargo: registro.colaborador?.cargo || "",
-          estadoGeneral: calcularEstadoGeneralEpp(registro.condicionesEpp || []),
-          formulario,
-          registro,
-        }))
-      ),
-    [registrosRegistros]
-  );
-
-  const filasFiltradasRegistros = useMemo(() => {
-    const busqueda = normalizarBusqueda(busquedaRegistros.trim());
-    return filasRegistros.filter((fila) => {
-      const texto = normalizarBusqueda(
-        [
-          fila.colaborador,
-          fila.cargo,
-          fila.lugar,
-          fila.areaTrabajo,
-          fila.estadoGeneral,
-          ...(fila.registro.condicionesEpp || []).map((item) => item.epp),
-          ...(fila.registro.otrosEpps?.detalle || []).map((item) => item.cual),
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-      const coincideBusqueda = !busqueda || texto.includes(busqueda);
-      const coincideEstado =
-        filtroEstadoRegistros === "todos" ||
-        (filtroEstadoRegistros === "bueno" && fila.estadoGeneral === "Bueno") ||
-        (filtroEstadoRegistros === "regular" && fila.estadoGeneral === "Regular") ||
-        (filtroEstadoRegistros === "malo" && fila.estadoGeneral === "Malo") ||
-        (filtroEstadoRegistros === "na" && fila.estadoGeneral === "N/A");
-      return coincideBusqueda && coincideEstado;
-    });
-  }, [busquedaRegistros, filasRegistros, filtroEstadoRegistros]);
-
-  const resumenRegistros = useMemo(() => {
-    const condiciones = filasFiltradasRegistros.flatMap((fila) => fila.registro.condicionesEpp || []);
-    return {
-      totalInspecciones: registrosRegistros.length,
-      totalElementos: condiciones.length,
-      buenos: condiciones.filter((item) => item.condicionId === 1).length,
-      regulares: condiciones.filter((item) => item.condicionId === 2).length,
-      malos: condiciones.filter((item) => item.condicionId === 3).length,
-    };
-  }, [filasFiltradasRegistros, registrosRegistros.length]);
-
-  const conteoPorLugarRegistros = useMemo(() => {
-    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
-      const key = fila.lugar || "Sin lugar";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
-  }, [filasFiltradasRegistros]);
-
-  const conteoPorAreaRegistros = useMemo(() => {
-    const conteo = filasFiltradasRegistros.reduce<Record<string, number>>((acc, fila) => {
-      const key = fila.areaTrabajo || "Sin área";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(conteo).map(([label, value]) => ({ label, value }));
-  }, [filasFiltradasRegistros]);
-
-  const colaboradoresConMalosRegistros = useMemo(
-    () => filasFiltradasRegistros.filter((fila) => (fila.registro.condicionesEpp || []).some((item) => item.condicionId === 3)),
-    [filasFiltradasRegistros]
-  );
-
-  const filaSeleccionadaRegistros = useMemo(
-    () => filasRegistros.find((fila) => fila.id === registroRegistrosSeleccionadoId) || null,
-    [filasRegistros, registroRegistrosSeleccionadoId]
-  );
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const fieldName = name as keyof DatosFormulario;
     const nextValue = camposSinNumeros.has(fieldName) ? quitarNumeros(value) : value;
-
-    if (fieldName === "otrosEpps") {
-      const cantidad = Number(nextValue || 0);
-      setDatos((prev) => ({
-        ...prev,
-        otrosEpps: nextValue,
-        otrosEppsDetalle: crearDetalleOtrosEpps(cantidad, prev.otrosEppsDetalle),
-      }));
-      return;
-    }
 
     setDatos((prev) => ({ ...prev, [fieldName]: nextValue }));
   };
@@ -432,14 +233,23 @@ export default function InspeccionEppForm() {
     }));
   };
 
-  const handleCantidadOtrosEpps = (nextValue: string) => {
-    const cantidad = Number(nextValue || 0);
+  const handleAgregarOtroEpp = () => {
     setDatos((prev) => ({
       ...prev,
-      otrosEpps: nextValue,
-      otrosEppsDetalle: crearDetalleOtrosEpps(cantidad, prev.otrosEppsDetalle),
+      otrosEpps: String(prev.otrosEppsDetalle.length + 1),
+      otrosEppsDetalle: [...prev.otrosEppsDetalle, { cual: "", condicion: "" }],
     }));
-    setCantidadOtrosAbierta(false);
+  };
+
+  const handleEliminarOtroEpp = (index: number) => {
+    setDatos((prev) => {
+      const otrosEppsDetalle = prev.otrosEppsDetalle.filter((_, itemIndex) => itemIndex !== index);
+      return {
+        ...prev,
+        otrosEpps: otrosEppsDetalle.length > 0 ? String(otrosEppsDetalle.length) : "",
+        otrosEppsDetalle,
+      };
+    });
   };
 
   const handleCondicionEpp = (campo: CampoEppKey, condicion: CondicionEpp) => {
@@ -605,6 +415,81 @@ export default function InspeccionEppForm() {
     }
   };
 
+  const renderOtrosEpps = () => (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-950">Otros EPPs</p>
+          <p className="mt-1 text-sm font-medium text-slate-500">Agregue solo los elementos adicionales que apliquen.</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleAgregarOtroEpp}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 sm:w-auto"
+        >
+          <PlusCircle className="size-4" aria-hidden="true" />
+          Agregar otro EPP
+        </button>
+      </div>
+
+      {datos.otrosEppsDetalle.length > 0 ? (
+        <div className="mt-5 grid gap-4">
+          {datos.otrosEppsDetalle.map((otroEpp, index) => (
+            <div key={`otro-epp-${index}`} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <p className="text-sm font-bold uppercase text-slate-700">Otro EPP {index + 1}</p>
+                <button
+                  type="button"
+                  onClick={() => handleEliminarOtroEpp(index)}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold uppercase text-red-700 transition hover:bg-red-100 sm:w-auto"
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Eliminar
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(220px,1fr)_auto] lg:items-end">
+                <div>
+                  <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
+                  <input
+                    data-required-id={`otroEppCual-${index}`}
+                    value={otroEpp.cual}
+                    onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
+                    placeholder={`Ej: Arnés, careta, línea de vida`}
+                    className={fieldClassName}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-700">Condición</label>
+                  <div data-required-id={`otroEppCondicion-${index}`} className="mt-2 flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 lg:w-fit">
+                    {opcionesCondicion.map((opcion) => {
+                      const seleccionado = otroEpp.condicion === opcion;
+                      return (
+                        <button
+                          key={`otro-epp-${index}-${opcion}`}
+                          type="button"
+                          onClick={() => handleOtroEppChange(index, "condicion", opcion)}
+                          aria-pressed={seleccionado}
+                          className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
+                        >
+                          {etiquetaCondicion(opcion)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-5 text-center">
+          <p className="text-sm font-semibold text-slate-500">No hay otros EPPs agregados.</p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
       <div className="w-full max-w-full">
@@ -677,7 +562,7 @@ export default function InspeccionEppForm() {
                 </div>
                 <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Datos generales</h3>
               </div>
-              <div className="grid gap-4 p-5 md:grid-cols-2">
+              <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Correo electrónico {requiredMark}</label>
                   <input name="email" type="email" value={datos.email} onChange={handleChange} placeholder="usuario@empresa.com" className={fieldClassName} />
@@ -737,62 +622,14 @@ export default function InspeccionEppForm() {
                       <div className="bg-emerald-800 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white">
                         {grupo.label}
                       </div>
-                      <div className="grid gap-4 p-4 md:grid-cols-2">
+                      <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
                         {grupo.fields.map((campo) =>
                           campo.key === "otrosEpps" ? (
-                            <div key={campo.key} className="rounded-md border border-slate-300 bg-slate-50 px-4 py-3 md:col-span-2">
-                              <label className="text-xs font-bold uppercase text-slate-950">{campo.label}</label>
-                              <select name={campo.key} value={datos.otrosEpps} onChange={handleChange} className={selectClassName}>
-                                <option value="">Seleccione una opción</option>
-                                {opcionesCantidadOtrosEpps.map((opcion) => (
-                                  <option key={opcion} value={opcion}>
-                                    {opcion}
-                                  </option>
-                                ))}
-                              </select>
-
-                              {datos.otrosEppsDetalle.length > 0 ? (
-                                <div className="mt-5 grid gap-4">
-                                  {datos.otrosEppsDetalle.map((otroEpp, index) => (
-                                    <div key={`otro-epp-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
-                                      <div>
-                                        <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
-                                        <input
-                                          data-required-id={`otroEppCual-${index}`}
-                                          value={otroEpp.cual}
-                                          onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
-                                          placeholder={`Otro EPP ${index + 1}`}
-                                          className={fieldClassName}
-                                        />
-                                      </div>
-                                      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center">
-                                        <label className="text-sm font-semibold text-slate-700">Condición</label>
-                                        <div data-required-id={`otroEppCondicion-${index}`} className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit">
-                                          {opcionesCondicion.map((opcion) => {
-                                            const seleccionado = otroEpp.condicion === opcion;
-                                            return (
-                                              <button
-                                                key={`otro-epp-${index}-${opcion}`}
-                                                type="button"
-                                                onClick={() => handleOtroEppChange(index, "condicion", opcion)}
-                                                aria-pressed={seleccionado}
-                                                className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
-                                              >
-                                                {etiquetaCondicion(opcion)}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : null}
-                            </div>
+                            <div key={campo.key} className="md:col-span-2 2xl:col-span-3">{renderOtrosEpps()}</div>
                           ) : (
-                            <div key={campo.key} className="grid min-h-[50px] gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center">
+                            <div key={campo.key} className="grid min-h-[92px] gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center 2xl:grid-cols-1 2xl:items-start">
                               <p className="text-xs font-bold uppercase text-slate-950">{campo.label}</p>
-                              <div className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit">
+                              <div className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit 2xl:w-full">
                                 {opcionesCondicion.map((opcion) => {
                                   const seleccionado = datos[campo.key] === opcion;
                                   return (
@@ -815,93 +652,7 @@ export default function InspeccionEppForm() {
                     </section>
                   ))}
 
-                  <div>
-                    <label className="text-xs font-bold uppercase text-slate-950">OTROS EPPS</label>
-                    <div className="relative mt-2">
-                      <button
-                        type="button"
-                        name="otrosEpps"
-                        onClick={() => setCantidadOtrosAbierta((prev) => !prev)}
-                        onBlur={() => window.setTimeout(() => setCantidadOtrosAbierta(false), 150)}
-                        aria-haspopup="listbox"
-                        aria-expanded={cantidadOtrosAbierta}
-                        className="flex w-full items-center rounded-3xl border border-slate-300 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-950 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      >
-                        <span>{datos.otrosEpps || "Seleccione una opción"}</span>
-                      </button>
-
-                      {cantidadOtrosAbierta ? (
-                        <div
-                          role="listbox"
-                          className="absolute left-0 top-full z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-2xl border border-slate-300 bg-white py-1 text-sm font-semibold text-slate-950 shadow-lg"
-                        >
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={!datos.otrosEpps}
-                            onMouseDown={() => handleCantidadOtrosEpps("")}
-                            className={`block w-full px-4 py-2 text-left transition hover:bg-slate-100 ${
-                              !datos.otrosEpps ? "bg-slate-700 text-white hover:bg-slate-700" : "text-slate-950"
-                            }`}
-                          >
-                            Seleccione una opción
-                          </button>
-                          {opcionesCantidadOtrosEpps.map((opcion) => (
-                            <button
-                              key={opcion}
-                              type="button"
-                              role="option"
-                              aria-selected={datos.otrosEpps === opcion}
-                              onMouseDown={() => handleCantidadOtrosEpps(opcion)}
-                              className={`block w-full px-4 py-2 text-left transition hover:bg-slate-100 ${
-                                datos.otrosEpps === opcion ? "bg-slate-700 text-white hover:bg-slate-700" : "text-slate-950"
-                              }`}
-                            >
-                              {opcion}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {datos.otrosEppsDetalle.length > 0 ? (
-                    <div className="mt-5 grid gap-4">
-                      {datos.otrosEppsDetalle.map((otroEpp, index) => (
-                        <div key={`otro-epp-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
-                          <div>
-                            <label className="text-sm font-semibold italic text-slate-700">¿Cuál?</label>
-                            <input
-                              data-required-id={`otroEppCual-${index}`}
-                              value={otroEpp.cual}
-                              onChange={(event) => handleOtroEppChange(index, "cual", event.target.value)}
-                              placeholder={`Otro EPP ${index + 1}`}
-                              className={fieldClassName}
-                            />
-                          </div>
-                          <div className="mt-4 grid gap-3">
-                            <label className="text-sm font-semibold text-slate-700">Condición</label>
-                            <div data-required-id={`otroEppCondicion-${index}`} className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit">
-                              {opcionesCondicion.map((opcion) => {
-                                const seleccionado = otroEpp.condicion === opcion;
-                                return (
-                                  <button
-                                    key={`otro-epp-${index}-${opcion}`}
-                                    type="button"
-                                    onClick={() => handleOtroEppChange(index, "condicion", opcion)}
-                                    aria-pressed={seleccionado}
-                                    className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
-                                  >
-                                    {etiquetaCondicion(opcion)}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
+                  {renderOtrosEpps()}
                 </div>
 
                 <div className="md:col-span-2">
