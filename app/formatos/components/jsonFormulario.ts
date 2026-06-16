@@ -21,6 +21,7 @@ type ArchivoFormulario = {
   mimeType: string;
   hasFile: boolean;
   fileUrl: string;
+  dataUrl?: string;
 };
 
 type OpcionesArchivo = {
@@ -105,6 +106,7 @@ export const limpiarImagenParaJson = ({
     mimeType: tipoArchivo,
     hasFile: true,
     fileUrl: `/uploads/${carpeta}/${fileName}`,
+    ...(dataUrl ? { dataUrl } : {}),
   };
 };
 

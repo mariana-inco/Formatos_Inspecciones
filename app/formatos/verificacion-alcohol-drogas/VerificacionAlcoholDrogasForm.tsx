@@ -270,6 +270,17 @@ export default function VerificacionAlcoholDrogasForm() {
     referenciaFirma.current?.clear();
   };
 
+  const reiniciarFormularioCompleto = () => {
+    setDatos(datosIniciales);
+    setRegistros([]);
+    setIndiceEdicion(null);
+    setModalFirmaAbierto(false);
+    setEvidenciaVisible(null);
+    setFirmaTieneTrazo(false);
+    setImagenInputKey((prev) => prev + 1);
+    referenciaFirma.current?.clear();
+  };
+
   const obtenerCamposFaltantesRegistro = () => {
     const camposFaltantes: string[] = [];
 
@@ -426,6 +437,7 @@ export default function VerificacionAlcoholDrogasForm() {
       }
 
       await respuestaHttp.json();
+      reiniciarFormularioCompleto();
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");

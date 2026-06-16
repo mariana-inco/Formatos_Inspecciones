@@ -192,10 +192,12 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
     return (registro.registros || []).map((item: any) => {
       const grado1 = Number(item.personaEvaluada?.gradoDetectadoMg100ml || 0);
       const grado2 = Number(item.personaEvaluada?.gradoDetectadoSegundaPruebaMg100ml || 0);
-      const positivo = grado1 >= 20 || grado2 >= 20 || item.personaEvaluada?.resultadoPrimeraPruebaInicial === "Positivo" || item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria === "Positivo";
-      const sedeArea = sedeAreaValida(registro.datosGenerales?.sede);
-      const responsable = registro.datosGenerales?.evaluador || registro.registro?.usuarioEmail || "-";
-      const fecha = registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
+      const resultado1 = String(item.personaEvaluada?.resultadoPrimeraPruebaInicial || "").toUpperCase();
+      const resultado2 = String(item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria || "").toUpperCase();
+      const positivo = grado1 >= 20 || grado2 >= 20 || resultado1 === "POSITIVO" || resultado2 === "POSITIVO";
+      const sedeArea = sedeAreaValida(registro.datosGenerales?.centroTrabajoSede || registro.datosGenerales?.sede);
+      const responsable = registro.datosGenerales?.realizadoPor?.nombre || registro.datosGenerales?.evaluador || registro.registro?.usuarioEmail || "-";
+      const fecha = registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10) || "-";
       return {
         codigo,
         formato: nombreFormato(codigo),
@@ -216,7 +218,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
               : "Resultados registrados como conformes.",
           },
         ],
-        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, item.personaEvaluada?.nombre, registro.datosGenerales?.criterioTomaMuestra]),
+        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, item.personaEvaluada?.nombre, registro.datosGenerales?.criteriosTomaMuestra || registro.datosGenerales?.criterioTomaMuestra]),
       };
     });
   }
