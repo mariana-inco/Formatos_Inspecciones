@@ -21,6 +21,7 @@ export type RegistroModulo = {
   ruta: string;
   detalleUrl: string;
   fecha: string;
+  fechaCreacionMs?: number;
   responsable: string;
   sedeArea: string;
   estado: "Conforme" | "Con novedad" | "Regular" | "Pendiente";
@@ -102,6 +103,29 @@ const textoSeguro = (value: unknown, fallback: string) => {
   return fallback;
 };
 
+const extraerFechaArchivo = (archivo?: string) => {
+  const match = archivo?.match(/(\d{4}-\d{2}-\d{2}T[\d-]+)/);
+  if (!match) return "";
+  const [fecha, hora = ""] = match[1].split("T");
+  return `${fecha}T${hora.replace(/-/g, ":")}`;
+};
+
+const obtenerFechaCreacion = (registro: RespuestaJsonModulo) =>
+  registro.registro?.fechaRegistro || registro.fechaRegistro || extraerFechaArchivo(registro.__archivo);
+
+const obtenerFechaCreacionMs = (registro: RespuestaJsonModulo) => {
+  const tiempo = Date.parse(obtenerFechaCreacion(registro));
+  return Number.isFinite(tiempo) ? tiempo : 0;
+};
+
+const datosBaseRegistro = (codigo: string, ruta: string, registro: RespuestaJsonModulo) => ({
+  codigo,
+  formato: nombreFormato(codigo),
+  ruta,
+  detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+  fechaCreacionMs: obtenerFechaCreacionMs(registro),
+});
+
 const detalleEstadoCondicion = (estadoId?: number | null): DetalleRegistroModulo["estado"] => {
   if (estadoId === 1) return "Conforme";
   if (estadoId === 2 || estadoId === 3) return "Con novedad";
@@ -128,7 +152,9 @@ const detalleEstadoChequeo = (estadoId?: number | null): DetalleRegistroModulo["
 
 const detalleRegistroUrl = (codigo: string, archivo: string) => `/formatos/registros/${codigo}/${encodeURIComponent(archivo)}`;
 
-const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroModulo[] => {
+const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonModulo): RegistroModulo[] => {
+  const base = datosBaseRegistro(codigo, ruta, registro);
+
   if (codigo === "HSE-F006") {
     const decision = registro.cierreInspeccion?.decisionFinalId;
     const estado = decision === 1 ? "Conforme" : decision === 2 ? "Con novedad" : "Pendiente";
@@ -137,10 +163,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
     const fecha = registro.datosEquipo?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
     return [
       {
-        codigo,
-        formato: nombreFormato(codigo),
-        ruta,
-        detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+        ...base,
         fecha,
         responsable,
         sedeArea,
@@ -168,10 +191,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
       const responsable = item.trabajador?.nombre || registro.registro?.usuarioEmail || "-";
       const fecha = registro.datosGenerales?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
       return {
-        codigo,
-        formato: nombreFormato(codigo),
-        ruta,
-        detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+        ...base,
         fecha,
         responsable,
         sedeArea,
@@ -199,10 +219,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
       const responsable = registro.datosGenerales?.realizadoPor?.nombre || registro.datosGenerales?.evaluador || registro.registro?.usuarioEmail || "-";
       const fecha = registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10) || "-";
       return {
-        codigo,
-        formato: nombreFormato(codigo),
-        ruta,
-        detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+        ...base,
         fecha,
         responsable,
         sedeArea,
@@ -236,10 +253,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
       const responsable = registro.datosInspeccion?.responsableInspeccion || registro.registro?.usuarioEmail || "-";
       const fecha = registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10) || "-";
       return {
-        codigo,
-        formato: nombreFormato(codigo),
-        ruta,
-        detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+        ...base,
         fecha,
         responsable,
         sedeArea,
@@ -277,10 +291,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
     const fecha = registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
     return [
       {
-        codigo,
-        formato: nombreFormato(codigo),
-        ruta,
-        detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+        ...base,
         fecha,
         responsable,
         sedeArea,
@@ -307,8 +318,52 @@ const cargarRegistrosModulo = async () => {
       return respuestas.flatMap((respuesta) => mapearRegistro(fuente.codigo, fuente.ruta, respuesta));
     })
   );
-  return registros.flat().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  return registros.flat().sort((a, b) => (b.fechaCreacionMs || 0) - (a.fechaCreacionMs || 0) || String(b.fecha).localeCompare(String(a.fecha)));
 };
+
+const prioridadEstado: Record<RegistroModulo["estado"], number> = {
+  "Con novedad": 4,
+  Regular: 3,
+  Pendiente: 2,
+  Conforme: 1,
+};
+
+const prioridadRecarga: Record<EstadoRecarga["severidad"], number> = {
+  malo: 5,
+  critico: 4,
+  regular: 3,
+  pendiente: 2,
+  bueno: 1,
+};
+
+const consolidarRegistrosRecientes = (registros: RegistroModulo[]) =>
+  Array.from(
+    registros
+      .reduce<Map<string, RegistroModulo>>((acc, registro) => {
+        const existente = acc.get(registro.detalleUrl);
+        if (!existente) {
+          acc.set(registro.detalleUrl, registro);
+          return acc;
+        }
+
+        const estado = prioridadEstado[registro.estado] > prioridadEstado[existente.estado] ? registro.estado : existente.estado;
+        const recarga =
+          registro.recarga && (!existente.recarga || prioridadRecarga[registro.recarga.severidad] > prioridadRecarga[existente.recarga.severidad])
+            ? registro.recarga
+            : existente.recarga;
+
+        acc.set(registro.detalleUrl, {
+          ...existente,
+          estado,
+          recarga,
+          novedades: existente.novedades + registro.novedades,
+          busqueda: `${existente.busqueda} ${registro.busqueda}`,
+          detalles: [...existente.detalles, ...registro.detalles],
+        });
+        return acc;
+      }, new Map())
+      .values()
+  ).sort((a, b) => (b.fechaCreacionMs || 0) - (a.fechaCreacionMs || 0) || String(b.fecha).localeCompare(String(a.fecha)));
 
 const claseEstado = (estado: string) => {
   if (estado === "Conforme") return "bg-[#E8F5E9] text-[#006948]";
@@ -385,6 +440,7 @@ export default async function FormatosPage({
     const coincideHasta = !rangoPeriodo.hasta || registro.fecha <= rangoPeriodo.hasta;
     return coincideBusqueda && coincideFormato && coincideEstado && coincideDesde && coincideHasta;
   });
+  const registrosRecientes = consolidarRegistrosRecientes(registrosFiltrados).slice(0, 10);
   const mesActual = new Date().toISOString().slice(0, 7);
   const total = registrosFiltrados.length;
   const inspeccionesMes = registrosFiltrados.filter((registro) => registro.fecha.startsWith(mesActual)).length;
@@ -626,7 +682,7 @@ export default async function FormatosPage({
             })}
           </section>
 
-          <InspeccionesRecientes registros={registrosFiltrados.slice(0, 10)} />
+          <InspeccionesRecientes registros={registrosRecientes} />
 
           </>
         ) : (
