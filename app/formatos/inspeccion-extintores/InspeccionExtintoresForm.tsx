@@ -10,6 +10,8 @@ import {
   UserCog,
 } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
+import { calcularEstadoRecarga } from "../components/estadoRecarga";
+import type { SeveridadRecarga } from "../components/estadoRecarga";
 import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
 
 const METADATOS_FORMATO = {
@@ -166,6 +168,13 @@ const claseBotonRevision = (value: EstadoRevision, seleccionado: boolean) => {
   if (value === "MALO") return "border border-red-300 bg-red-100 text-red-800 shadow-sm";
   return "border border-slate-700 bg-slate-700 text-white shadow-sm ring-2 ring-slate-400";
 };
+const claseRecarga = (severidad: SeveridadRecarga) => {
+  if (severidad === "bueno") return "bg-emerald-100 text-emerald-800";
+  if (severidad === "regular") return "bg-amber-100 text-amber-800";
+  if (severidad === "critico") return "bg-orange-100 text-orange-800";
+  if (severidad === "malo") return "bg-red-100 text-red-800";
+  return "bg-slate-100 text-slate-700";
+};
 
 const serializarFirma = (svg: SVGSVGElement) => {
   const firmaClonada = svg.cloneNode(true) as SVGSVGElement;
@@ -189,6 +198,7 @@ export default function InspeccionExtintoresForm() {
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
+  const estadoRecargaRegistro = calcularEstadoRecarga(registro.fechaProximaRecarga);
 
   const manejarCambioDatosInspeccion = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -510,6 +520,12 @@ export default function InspeccionExtintoresForm() {
               <div className="col-span-12 md:col-span-6">
                 <label className={etiquetaCampo}>Fecha próxima recarga {marcaObligatorio}</label>
                 <input name="fechaProximaRecarga" type="date" value={registro.fechaProximaRecarga} onChange={manejarCambioRegistro} className={campoFecha} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(estadoRecargaRegistro.severidad)}`}>
+                    {estadoRecargaRegistro.estado}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-500">{estadoRecargaRegistro.mensaje}</span>
+                </div>
               </div>
             </div>
 
@@ -606,6 +622,17 @@ export default function InspeccionExtintoresForm() {
                       <div className="rounded-lg border-l-4 border-amber-500 bg-yellow-200 p-3">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-yellow-900">Próxima recarga</p>
                         <p className="mt-1 text-sm font-bold text-slate-950">{mostrarValor(item.fechaProximaRecarga)}</p>
+                        {(() => {
+                          const recarga = calcularEstadoRecarga(item.fechaProximaRecarga);
+                          return (
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${claseRecarga(recarga.severidad)}`}>
+                                {recarga.estado}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-700">{recarga.mensaje}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

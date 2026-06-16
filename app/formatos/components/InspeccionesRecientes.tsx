@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Eye, HardHat, X } from "lucide-react";
 import type { DetalleRegistroModulo, RegistroModulo } from "../page";
+import type { SeveridadRecarga } from "./estadoRecarga";
 
 type Props = {
   registros: RegistroModulo[];
@@ -16,6 +17,38 @@ const claseEstado = (estado: string) => {
   return "bg-amber-50 text-amber-700";
 };
 
+const claseRecarga = (severidad: SeveridadRecarga) => {
+  if (severidad === "bueno") return "bg-[#E8F5E9] text-[#006948]";
+  if (severidad === "regular") return "bg-amber-50 text-amber-700";
+  if (severidad === "critico") return "bg-orange-100 text-orange-800";
+  if (severidad === "malo") return "bg-[#FFEBEE] text-red-700";
+  return "bg-slate-100 text-slate-700";
+};
+
+const detalleCortoRecarga = (registro: RegistroModulo) => {
+  const recarga = registro.recarga;
+  if (!recarga) return "";
+  if (recarga.estado === "Regular" && recarga.dias !== null) return `Faltan ${recarga.dias} días`;
+  if (recarga.estado === "Vencido" && recarga.dias !== null) return `Hace ${Math.abs(recarga.dias)} días`;
+  if (recarga.estado === "Vence hoy") return "Requiere gestión";
+  if (recarga.estado === "Pendiente") return "Sin fecha registrada";
+  if (recarga.estado === "Bueno" && recarga.dias !== null) return `Faltan ${recarga.dias} días`;
+  return recarga.mensaje;
+};
+
+const detalleConsultivoRecarga = (registro: RegistroModulo) => {
+  const recarga = registro.recarga;
+  if (!recarga) return null;
+  if (recarga.estado === "Regular" && recarga.dias !== null) {
+    return `Este extintor está próximo a vencer. Faltan ${recarga.dias} días para la próxima recarga.`;
+  }
+  if (recarga.estado === "Vencido" && recarga.dias !== null) {
+    return `Este extintor está vencido. Han pasado ${Math.abs(recarga.dias)} días desde la fecha de próxima recarga.`;
+  }
+  if (recarga.estado === "Vence hoy") return "Este extintor vence hoy. Requiere gestión.";
+  return recarga.mensaje;
+};
+
 const claseDetalle = (estado: string) => {
   if (estado === "Conforme") return "bg-[#E8F5E9] text-[#006948]";
   if (estado === "Con novedad") return "bg-[#FFEBEE] text-red-700";
@@ -25,6 +58,14 @@ const claseDetalle = (estado: string) => {
 };
 
 const obtenerDetallePrincipal = (registro: RegistroModulo) => {
+  if (registro.codigo === "HSE-F003" && registro.recarga) {
+    return {
+      titulo: "Estado de próxima recarga",
+      descripcion: detalleConsultivoRecarga(registro) || registro.recarga.mensaje,
+      items: registro.detalles.filter((detalle) => detalle.grupo === "Vencimiento" || detalle.estado === "Regular" || detalle.estado === "Con novedad"),
+    };
+  }
+
   if (registro.estado === "Conforme") {
     return {
       titulo: "Elementos conformes",
@@ -112,9 +153,18 @@ export default function InspeccionesRecientes({ registros }: Props) {
                   </div>
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
-                    {registro.estado}
-                  </span>
+                  {registro.codigo === "HSE-F003" && registro.recarga ? (
+                    <div className="inline-flex flex-col items-start gap-1">
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registro.recarga.severidad)}`}>
+                        {registro.recarga.estado}
+                      </span>
+                      <span className="text-[11px] font-semibold leading-tight text-slate-500">{detalleCortoRecarga(registro)}</span>
+                    </div>
+                  ) : (
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                      {registro.estado}
+                    </span>
+                  )}
                 </td>
                 <td className="px-5 py-4">
                   <button
@@ -165,7 +215,7 @@ export default function InspeccionesRecientes({ registros }: Props) {
                   ["Fecha", registroActivo.fecha],
                   ["Sede / Área", registroActivo.sedeArea],
                   ["Responsable", registroActivo.responsable],
-                  ["Estado", registroActivo.estado],
+                  ["Estado", registroActivo.codigo === "HSE-F003" && registroActivo.recarga ? registroActivo.recarga.estado : registroActivo.estado],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
@@ -181,9 +231,15 @@ export default function InspeccionesRecientes({ registros }: Props) {
                       <h4 className="text-base font-bold text-slate-950">{detallePrincipal.titulo}</h4>
                       <p className="mt-1 text-sm font-medium text-slate-500">{detallePrincipal.descripcion}</p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registroActivo.estado)}`}>
-                      {registroActivo.novedades} novedad{registroActivo.novedades === 1 ? "" : "es"}
-                    </span>
+                    {registroActivo.codigo === "HSE-F003" && registroActivo.recarga ? (
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registroActivo.recarga.severidad)}`}>
+                        {detalleCortoRecarga(registroActivo)}
+                      </span>
+                    ) : (
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registroActivo.estado)}`}>
+                        {registroActivo.novedades} novedad{registroActivo.novedades === 1 ? "" : "es"}
+                      </span>
+                    )}
                   </div>
                 </div>
 

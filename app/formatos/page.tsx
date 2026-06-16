@@ -4,6 +4,8 @@ import Link from "next/link";
 import { FileText, LayoutDashboard, Play, ShieldCheck } from "lucide-react";
 import DashboardFiltros from "./components/DashboardFiltros";
 import DistribucionFormatoDona from "./components/DistribucionFormatoDona";
+import { calcularEstadoRecarga } from "./components/estadoRecarga";
+import type { EstadoRecarga } from "./components/estadoRecarga";
 import InspeccionesRecientes from "./components/InspeccionesRecientes";
 import { formatos } from "./data";
 
@@ -25,6 +27,7 @@ export type RegistroModulo = {
   novedades: number;
   busqueda: string;
   vencimiento?: "Vencido" | "Próximo" | "Vigente";
+  recarga?: EstadoRecarga;
   detalles: DetalleRegistroModulo[];
 };
 
@@ -45,18 +48,6 @@ const fuentes = [
 const coloresDistribucion = ["#006948", "#20A37A", "#8BD7BD", "#B7E4C7", "#CBD5E1"];
 
 const nombreFormato = (codigo: string) => formatos.find((formato) => formato.codigo === codigo)?.nombre || codigo;
-
-const estadoRecarga = (fecha?: string) => {
-  if (!fecha) return "Vigente" as const;
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const proxima = new Date(`${fecha}T00:00:00`);
-  if (Number.isNaN(proxima.getTime())) return "Vigente" as const;
-  const dias = Math.ceil((proxima.getTime() - hoy.getTime()) / 86400000);
-  if (dias < 0) return "Vencido" as const;
-  if (dias <= 30) return "Próximo" as const;
-  return "Vigente" as const;
-};
 
 const contar = (items: string[]) =>
   Object.entries(
@@ -88,8 +79,22 @@ const leerJson = async (dir: string): Promise<RespuestaJsonModulo[]> => {
 };
 
 const sedeAreaValida = (value?: string) => value?.trim() || "Sin sede/área registrada";
+const normalizarBusqueda = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+const normalizarBusquedaFlexible = (value: string) => normalizarBusqueda(value).replace(/[^a-z0-9]+/g, "");
 const unirBusqueda = (items: Array<string | number | undefined | null>) =>
-  items.filter(Boolean).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  items
+    .filter(Boolean)
+    .flatMap((item) => {
+      const texto = normalizarBusqueda(String(item));
+      const textoFlexible = normalizarBusquedaFlexible(texto);
+      return textoFlexible && textoFlexible !== texto ? [texto, textoFlexible] : [texto];
+    })
+    .join(" ");
 
 const textoSeguro = (value: unknown, fallback: string) => {
   if (typeof value === "string" && value.trim()) return value.trim();
@@ -100,7 +105,18 @@ const textoSeguro = (value: unknown, fallback: string) => {
 const detalleEstadoCondicion = (estadoId?: number | null): DetalleRegistroModulo["estado"] => {
   if (estadoId === 1) return "Conforme";
   if (estadoId === 2 || estadoId === 3) return "Con novedad";
+  if (estadoId === 4) return "No aplica";
   return "Pendiente";
+};
+
+const estadoRevisionId = (revision: any) => {
+  if (typeof revision?.estadoId === "number") return revision.estadoId;
+  const estado = String(revision?.estado || revision?.revision || "").toUpperCase();
+  if (estado === "BUENO") return 1;
+  if (estado === "REGULAR") return 2;
+  if (estado === "MALO") return 3;
+  if (estado === "NO APLICA" || estado === "N/A") return 4;
+  return null;
 };
 
 const detalleEstadoChequeo = (estadoId?: number | null): DetalleRegistroModulo["estado"] => {
@@ -208,13 +224,15 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
   if (codigo === "HSE-F003") {
     return (registro.registros || []).map((item: any) => {
       const verificacion = item.verificacion || [];
-      const malos = verificacion.filter((revision: any) => revision.estadoId === 3).length;
-      const regulares = verificacion.filter((revision: any) => revision.estadoId === 2).length;
-      const vencimiento = estadoRecarga(item.identificacionExtintor?.fechaProximaRecarga);
-      const novedades = malos + (vencimiento === "Vencido" ? 1 : 0);
+      const malos = verificacion.filter((revision: any) => estadoRevisionId(revision) === 3).length;
+      const regulares = verificacion.filter((revision: any) => estadoRevisionId(revision) === 2).length;
+      const fechaProximaRecarga = item.identificacionExtintor?.fechaProximaRecarga || "";
+      const recarga = calcularEstadoRecarga(fechaProximaRecarga);
+      const vencimiento = recarga.estado === "Vencido" ? "Vencido" : recarga.estado === "Regular" || recarga.estado === "Vence hoy" ? "Próximo" : "Vigente";
+      const novedades = malos + (recarga.severidad === "malo" || recarga.severidad === "critico" ? 1 : 0);
       const sedeArea = sedeAreaValida(registro.datosInspeccion?.sedeCentroTrabajo || item.identificacionExtintor?.ubicacion);
       const responsable = registro.datosInspeccion?.responsableInspeccion || registro.registro?.usuarioEmail || "-";
-      const fecha = registro.registro?.fechaRegistro?.slice(0, 10) || "-";
+      const fecha = registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10) || "-";
       return {
         codigo,
         formato: nombreFormato(codigo),
@@ -226,21 +244,22 @@ const mapearRegistro = (codigo: string, ruta: string, registro: any): RegistroMo
         estado: novedades > 0 ? "Con novedad" : regulares > 0 || vencimiento === "Próximo" ? "Regular" : "Conforme",
         novedades,
         vencimiento,
+        recarga,
         detalles: [
           ...verificacion.map((revision: any, revisionIndex: number) => ({
             grupo: "Verificación del extintor",
             item: textoSeguro(revision.criterio || revision.item || revision.descripcion, `Revisión ${revisionIndex + 1}`),
-            estado: detalleEstadoCondicion(revision.estadoId),
+            estado: detalleEstadoCondicion(estadoRevisionId(revision)),
             observaciones: revision.observaciones,
           })),
           {
             grupo: "Vencimiento",
-            item: "Fecha próxima recarga",
-            estado: vencimiento === "Vencido" ? "Con novedad" : vencimiento === "Próximo" ? "Regular" : "Conforme",
-            observaciones: item.identificacionExtintor?.fechaProximaRecarga,
+            item: fechaProximaRecarga ? `Fecha próxima recarga: ${fechaProximaRecarga}` : "Fecha próxima recarga",
+            estado: recarga.severidad === "malo" || recarga.severidad === "critico" ? "Con novedad" : recarga.severidad === "regular" ? "Regular" : recarga.severidad === "pendiente" ? "Pendiente" : "Conforme",
+            observaciones: recarga.mensaje,
           },
         ],
-        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, item.identificacionExtintor?.numeroExtintor, item.identificacionExtintor?.ubicacion, item.observaciones]),
+        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, item.identificacionExtintor?.numeroExtintor, item.identificacionExtintor?.ubicacion, fechaProximaRecarga, item.observaciones]),
       };
     });
   }
@@ -352,8 +371,12 @@ export default async function FormatosPage({
   const periodo = filtroPeriodo || "todos";
   const rangoPeriodo = obtenerRangoPeriodo(periodo, fechaDesde, fechaHasta);
   const busquedaNormalizada = unirBusqueda([filtroBusqueda]);
+  const busquedaFlexible = normalizarBusquedaFlexible(filtroBusqueda);
   const registrosFiltrados = registros.filter((registro) => {
-    const coincideBusqueda = !busquedaNormalizada || registro.busqueda.includes(busquedaNormalizada);
+    const coincideBusqueda =
+      !busquedaNormalizada ||
+      registro.busqueda.includes(busquedaNormalizada) ||
+      (busquedaFlexible.length > 0 && registro.busqueda.includes(busquedaFlexible));
     const coincideFormato = !filtroFormato || registro.codigo === filtroFormato;
     const coincideEstado = !filtroEstado || registro.estado === filtroEstado;
     const coincideDesde = !rangoPeriodo.desde || registro.fecha >= rangoPeriodo.desde;

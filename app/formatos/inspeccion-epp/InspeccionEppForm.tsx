@@ -125,7 +125,7 @@ const estiloBotonCondicion = (condicion: CondicionEpp, seleccionado: boolean) =>
   if (condicion === "BUENO") return "border border-emerald-300 bg-emerald-100 text-emerald-800 shadow-sm";
   if (condicion === "REGULAR") return "border border-amber-300 bg-amber-100 text-amber-800 shadow-sm";
   if (condicion === "MALO") return "border border-red-300 bg-red-100 text-red-800 shadow-sm";
-  return "border border-slate-300 bg-slate-100 text-slate-700 shadow-sm";
+  return "border border-slate-700 bg-slate-700 text-white shadow-sm ring-2 ring-slate-400";
 };
 const iconosEpp: Partial<Record<CampoEppKey, LucideIcon>> = {
   casco: HardHat,
@@ -216,6 +216,9 @@ export default function InspeccionEppForm() {
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
 
+  const obtenerOpcionesCondicionVisibles = (condicionSeleccionada: CondicionEpp) =>
+    condicionSeleccionada ? [condicionSeleccionada] : opcionesCondicion;
+
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const fieldName = name as keyof DatosFormulario;
@@ -253,7 +256,16 @@ export default function InspeccionEppForm() {
   };
 
   const handleCondicionEpp = (campo: CampoEppKey, condicion: CondicionEpp) => {
-    setDatos((prev) => ({ ...prev, [campo]: condicion }));
+    setDatos((prev) => ({ ...prev, [campo]: prev[campo] === condicion ? "" : condicion }));
+  };
+
+  const handleCondicionOtroEpp = (index: number, condicion: CondicionEpp) => {
+    setDatos((prev) => ({
+      ...prev,
+      otrosEppsDetalle: prev.otrosEppsDetalle.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, condicion: item.condicion === condicion ? "" : condicion } : item
+      ),
+    }));
   };
 
   const limpiarCalificacion = () => {
@@ -461,14 +473,17 @@ export default function InspeccionEppForm() {
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Condición</label>
-                  <div data-required-id={`otroEppCondicion-${index}`} className="mt-2 flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 lg:w-fit">
-                    {opcionesCondicion.map((opcion) => {
+                  <div
+                    data-required-id={`otroEppCondicion-${index}`}
+                    className="mt-2 flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 lg:w-fit"
+                  >
+                    {obtenerOpcionesCondicionVisibles(otroEpp.condicion).map((opcion) => {
                       const seleccionado = otroEpp.condicion === opcion;
                       return (
                         <button
                           key={`otro-epp-${index}-${opcion}`}
                           type="button"
-                          onClick={() => handleOtroEppChange(index, "condicion", opcion)}
+                          onClick={() => handleCondicionOtroEpp(index, opcion)}
                           aria-pressed={seleccionado}
                           className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
                         >
@@ -629,8 +644,10 @@ export default function InspeccionEppForm() {
                           ) : (
                             <div key={campo.key} className="grid min-h-[92px] gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center 2xl:grid-cols-1 2xl:items-start">
                               <p className="text-xs font-bold uppercase text-slate-950">{campo.label}</p>
-                              <div className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit 2xl:w-full">
-                                {opcionesCondicion.map((opcion) => {
+                              <div
+                                className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit 2xl:w-full"
+                              >
+                                {obtenerOpcionesCondicionVisibles(datos[campo.key] as CondicionEpp).map((opcion) => {
                                   const seleccionado = datos[campo.key] === opcion;
                                   return (
                                     <button
