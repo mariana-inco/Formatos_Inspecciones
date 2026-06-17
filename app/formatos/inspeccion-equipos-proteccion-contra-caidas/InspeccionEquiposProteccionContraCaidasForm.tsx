@@ -491,21 +491,33 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
           prefijo: `equipo-${tipoInspeccionSeleccionado}`,
         }),
       },
-      respuestasChecklist: listaChequeoActual.map((item) => ({
-        key: item.key,
-        factor: item.factor,
-        instrucciones: item.instrucciones,
-        conceptoId: mapConceptoToId(respuestasListaChequeo[item.key]?.concepto || ""),
-        comentario: respuestasListaChequeo[item.key]?.comentario || "",
-      })),
+      respuestasChecklist: listaChequeoActual.map((item) => {
+        const respuesta = respuestasListaChequeo[item.key];
+        const concepto = respuesta?.concepto || "";
+
+        return {
+          key: item.key,
+          factor: item.factor,
+          instrucciones: item.instrucciones,
+          concepto,
+          conceptoId: mapConceptoToId(concepto),
+          comentario: respuesta?.comentario || "",
+        };
+      }),
       datosAdicionalesChecklist: mostrarDatosAdicionales
-        ? listaChequeoActual.map((item) => ({
-            key: item.key,
-            factor: item.factor,
-            instrucciones: item.instrucciones,
-            conceptoId: mapConceptoToId(respuestasListaChequeo[item.key]?.concepto || ""),
-            detalleApoyo: respuestasListaChequeo[item.key]?.comentario || "",
-          }))
+        ? listaChequeoActual.map((item) => {
+            const respuesta = respuestasListaChequeo[item.key];
+            const concepto = respuesta?.concepto || "";
+
+            return {
+              key: item.key,
+              factor: item.factor,
+              instrucciones: item.instrucciones,
+              concepto,
+              conceptoId: mapConceptoToId(concepto),
+              detalleApoyo: respuesta?.comentario || "",
+            };
+          })
         : [],
       cierreInspeccion: {
         comentariosFinales,

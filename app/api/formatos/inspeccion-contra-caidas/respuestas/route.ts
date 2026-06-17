@@ -56,7 +56,11 @@ export async function POST(request: Request) {
     await mkdir(respuestasDir, { recursive: true });
     await writeFile(filePath, JSON.stringify(respuesta, null, 2), "utf8");
 
-    console.log(`Respuesta guardada en JSON: ${filePath}`);
+    console.log("Respuesta HSE-F006 guardada en JSON:", {
+      filePath,
+      respuestasChecklist: Array.isArray(respuesta.respuestasChecklist) ? respuesta.respuestasChecklist.length : 0,
+      datosAdicionalesChecklist: Array.isArray(respuesta.datosAdicionalesChecklist) ? respuesta.datosAdicionalesChecklist.length : 0,
+    });
 
     return Response.json({
       ok: true,

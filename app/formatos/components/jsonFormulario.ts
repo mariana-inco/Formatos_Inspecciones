@@ -119,5 +119,9 @@ export const limpiarFirmaParaJson = (dataUrl: string, prefijo: string) =>
   });
 
 export const registrarJsonFinalFormulario = (registroFinal: unknown) => {
-  void registroFinal;
+  if (process.env.NODE_ENV !== "production") {
+    console.groupCollapsed("JSON final del formulario");
+    console.log(registroFinal);
+    console.groupEnd();
+  }
 };
