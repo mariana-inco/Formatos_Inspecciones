@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type DashboardFiltrosProps = {
   busqueda: string;
@@ -14,6 +14,8 @@ type DashboardFiltrosProps = {
   formatos: Array<{ codigo: string }>;
   sinResultadosPorFiltro: boolean;
 };
+
+const PERIODO_POR_DEFECTO = "hoy";
 
 export default function DashboardFiltros({
   busqueda,
@@ -28,8 +30,12 @@ export default function DashboardFiltros({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [periodoSeleccionado, setPeriodoSeleccionado] = useState(periodo || "todos");
-  const hayFiltrosActivos = Boolean(busqueda || formato || estado || periodoSeleccionado !== "todos" || fechaDesde || fechaHasta);
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState(periodo || PERIODO_POR_DEFECTO);
+  const hayFiltrosActivos = Boolean(busqueda || formato || estado || periodoSeleccionado !== PERIODO_POR_DEFECTO || fechaDesde || fechaHasta);
+
+  useEffect(() => {
+    setPeriodoSeleccionado(periodo || PERIODO_POR_DEFECTO);
+  }, [periodo]);
 
   const actualizarFiltro = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -41,7 +47,7 @@ export default function DashboardFiltros({
     }
 
     if (key === "periodo") {
-      setPeriodoSeleccionado(value || "todos");
+      setPeriodoSeleccionado(value || PERIODO_POR_DEFECTO);
       if (value !== "personalizado") {
         params.delete("desde");
         params.delete("hasta");

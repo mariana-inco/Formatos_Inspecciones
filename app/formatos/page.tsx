@@ -21,6 +21,7 @@ export type RegistroModulo = {
   ruta: string;
   detalleUrl: string;
   fecha: string;
+  fechaCreacion: string;
   fechaCreacionMs?: number;
   responsable: string;
   sedeArea: string;
@@ -123,6 +124,7 @@ const datosBaseRegistro = (codigo: string, ruta: string, registro: RespuestaJson
   formato: nombreFormato(codigo),
   ruta,
   detalleUrl: detalleRegistroUrl(codigo, registro.__archivo),
+  fechaCreacion: obtenerFechaCreacion(registro).slice(0, 10),
   fechaCreacionMs: obtenerFechaCreacionMs(registro),
 });
 
@@ -321,12 +323,49 @@ const cargarRegistrosModulo = async () => {
   return registros.flat().sort((a, b) => (b.fechaCreacionMs || 0) - (a.fechaCreacionMs || 0) || String(b.fecha).localeCompare(String(a.fecha)));
 };
 
-const claseEstado = (estado: string) => {
-  if (estado === "Conforme") return "bg-[#E8F5E9] text-[#006948]";
-  if (estado === "Con novedad") return "bg-[#FFEBEE] text-red-700";
-  if (estado === "Pendiente") return "bg-slate-100 text-slate-700";
-  return "bg-amber-50 text-amber-700";
+const prioridadEstado: Record<RegistroModulo["estado"], number> = {
+  "Con novedad": 4,
+  Regular: 3,
+  Pendiente: 2,
+  Conforme: 1,
 };
+
+const prioridadRecarga: Record<EstadoRecarga["severidad"], number> = {
+  malo: 5,
+  critico: 4,
+  regular: 3,
+  pendiente: 2,
+  bueno: 1,
+};
+
+const consolidarInspeccionesMetricas = (registros: RegistroModulo[]) =>
+  Array.from(
+    registros
+      .reduce<Map<string, RegistroModulo>>((acc, registro) => {
+        const existente = acc.get(registro.detalleUrl);
+        if (!existente) {
+          acc.set(registro.detalleUrl, registro);
+          return acc;
+        }
+
+        const estado = prioridadEstado[registro.estado] > prioridadEstado[existente.estado] ? registro.estado : existente.estado;
+        const recarga =
+          registro.recarga && (!existente.recarga || prioridadRecarga[registro.recarga.severidad] > prioridadRecarga[existente.recarga.severidad])
+            ? registro.recarga
+            : existente.recarga;
+
+        acc.set(registro.detalleUrl, {
+          ...existente,
+          estado,
+          recarga,
+          novedades: existente.novedades + registro.novedades,
+          busqueda: `${existente.busqueda} ${registro.busqueda}`,
+          detalles: [...existente.detalles, ...registro.detalles],
+        });
+        return acc;
+      }, new Map())
+      .values()
+  ).sort((a, b) => (b.fechaCreacionMs || 0) - (a.fechaCreacionMs || 0) || String(b.fecha).localeCompare(String(a.fecha)));
 
 const obtenerParametro = (params: Record<string, string | string[] | undefined>, key: string) => {
   const value = params[key];
@@ -374,6 +413,7 @@ export default async function FormatosPage({
 }) {
   const params = (await searchParams) || {};
   const registros = await cargarRegistrosModulo();
+  const inspecciones = consolidarInspeccionesMetricas(registros);
   const filtroBusqueda = obtenerParametro(params, "q");
   const filtroPeriodo = obtenerParametro(params, "periodo");
   const filtroFormato = obtenerParametro(params, "formato");
@@ -381,32 +421,34 @@ export default async function FormatosPage({
   const vistaActiva = obtenerParametro(params, "vista") === "formatos" ? "formatos" : "dashboard";
   const fechaDesde = obtenerParametro(params, "desde");
   const fechaHasta = obtenerParametro(params, "hasta");
-  const periodo = filtroPeriodo || "todos";
+  const periodo = filtroPeriodo || "hoy";
   const rangoPeriodo = obtenerRangoPeriodo(periodo, fechaDesde, fechaHasta);
   const busquedaNormalizada = unirBusqueda([filtroBusqueda]);
   const busquedaFlexible = normalizarBusquedaFlexible(filtroBusqueda);
-  const registrosFiltrados = registros.filter((registro) => {
+  const filtrarRegistro = (registro: RegistroModulo) => {
     const coincideBusqueda =
       !busquedaNormalizada ||
       registro.busqueda.includes(busquedaNormalizada) ||
       (busquedaFlexible.length > 0 && registro.busqueda.includes(busquedaFlexible));
     const coincideFormato = !filtroFormato || registro.codigo === filtroFormato;
     const coincideEstado = !filtroEstado || registro.estado === filtroEstado;
-    const coincideDesde = !rangoPeriodo.desde || registro.fecha >= rangoPeriodo.desde;
-    const coincideHasta = !rangoPeriodo.hasta || registro.fecha <= rangoPeriodo.hasta;
+    const coincideDesde = !rangoPeriodo.desde || registro.fechaCreacion >= rangoPeriodo.desde;
+    const coincideHasta = !rangoPeriodo.hasta || registro.fechaCreacion <= rangoPeriodo.hasta;
     return coincideBusqueda && coincideFormato && coincideEstado && coincideDesde && coincideHasta;
-  });
+  };
+  const registrosFiltrados = registros.filter(filtrarRegistro);
+  const inspeccionesMetricas = inspecciones.filter(filtrarRegistro);
   const registrosRecientes = registrosFiltrados.slice(0, 10);
   const mesActual = new Date().toISOString().slice(0, 7);
-  const total = registrosFiltrados.length;
-  const inspeccionesMes = registrosFiltrados.filter((registro) => registro.fecha.startsWith(mesActual)).length;
-  const conformes = registrosFiltrados.filter((registro) => registro.estado === "Conforme").length;
-  const novedades = registrosFiltrados.filter((registro) => registro.estado === "Con novedad").length;
-  const hayFiltrosActivos = Boolean(filtroBusqueda || filtroFormato || filtroEstado || periodo !== "todos");
-  const sinResultadosPorFiltro = registros.length > 0 && registrosFiltrados.length === 0 && hayFiltrosActivos;
-  const porFormatoCompleto = contar(registrosFiltrados.map((registro) => registro.codigo));
-  const novedadesPorFormatoCompleto = contar(registrosFiltrados.filter((registro) => registro.novedades > 0).map((registro) => registro.codigo));
-  const porSedeAreaCompleto = contar(registrosFiltrados.map((registro) => registro.sedeArea));
+  const total = inspeccionesMetricas.length;
+  const inspeccionesMes = inspeccionesMetricas.filter((registro) => registro.fechaCreacion.startsWith(mesActual)).length;
+  const conformes = inspeccionesMetricas.filter((registro) => registro.estado === "Conforme").length;
+  const novedades = inspeccionesMetricas.filter((registro) => registro.estado === "Con novedad").length;
+  const hayFiltrosActivos = Boolean(filtroBusqueda || filtroFormato || filtroEstado || periodo !== "hoy");
+  const sinResultadosPorFiltro = inspecciones.length > 0 && inspeccionesMetricas.length === 0 && hayFiltrosActivos;
+  const porFormatoCompleto = contar(inspeccionesMetricas.map((registro) => registro.codigo));
+  const novedadesPorFormatoCompleto = contar(inspeccionesMetricas.filter((registro) => registro.novedades > 0).map((registro) => registro.codigo));
+  const porSedeAreaCompleto = contar(inspeccionesMetricas.map((registro) => registro.sedeArea));
   const porFormato = porFormatoCompleto.slice(0, 5);
   const novedadesPorFormato = novedadesPorFormatoCompleto.slice(0, 5);
   const porSedeArea = porSedeAreaCompleto.slice(0, 5);
@@ -421,7 +463,7 @@ export default async function FormatosPage({
     return { key, label: label.charAt(0).toUpperCase() + label.slice(1) };
   });
   const tendencia = meses.map((mes) => {
-    const registrosMes = registrosFiltrados.filter((registro) => registro.fecha.startsWith(mes.key));
+    const registrosMes = inspeccionesMetricas.filter((registro) => registro.fechaCreacion.startsWith(mes.key));
     return { mes: mes.label, realizadas: registrosMes.length, novedades: registrosMes.filter((registro) => registro.estado === "Con novedad").length };
   });
   const maxTendencia = Math.max(...tendencia.flatMap((item) => [item.realizadas, item.novedades]), 1);
@@ -440,7 +482,7 @@ export default async function FormatosPage({
     return {
       codigo: fuente.codigo,
       nombreCorto,
-      value: registrosFiltrados.filter((registro) => registro.codigo === fuente.codigo).length,
+      value: inspeccionesMetricas.filter((registro) => registro.codigo === fuente.codigo).length,
       color: coloresDistribucion[index % coloresDistribucion.length],
     };
   });
@@ -520,11 +562,11 @@ export default async function FormatosPage({
             ].map((item) => (
               <article key={item.title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{item.title}</p>
                     <p className="mt-3 text-3xl font-bold text-slate-950">{item.value}</p>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${item.bg} ${item.tone}`}>{item.meta}</span>
+                  <span className={`inline-flex min-w-24 shrink-0 items-center justify-center rounded-full px-4 py-2 text-center text-xs font-bold whitespace-nowrap ${item.bg} ${item.tone}`}>{item.meta}</span>
                 </div>
               </article>
             ))}
@@ -540,7 +582,7 @@ export default async function FormatosPage({
                 <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
                   <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-[#006948]" />Realizadas</span>
                   <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-[#F87171]" />Novedades</span>
-                  <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-slate-300" />Sin registros</span>
+                  <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-slate-300" />Sin inspecciones</span>
                 </div>
               </div>
               {total > 0 ? (
@@ -581,13 +623,13 @@ export default async function FormatosPage({
             <article className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <div>
                 <h2 className="text-lg font-bold text-slate-950">Distribución por formato</h2>
-                <p className="mt-1 text-sm font-medium text-slate-500">Participación de registros según filtros activos.</p>
+                <p className="mt-1 text-sm font-medium text-slate-500">Participación de inspecciones creadas según filtros activos.</p>
               </div>
               <div className="mt-5">
                 {totalDistribucion > 0 ? (
                   <DistribucionFormatoDona segmentos={segmentosDistribucion} total={totalDistribucion} />
                 ) : (
-                  <p className="rounded-lg bg-slate-50 px-4 py-6 text-sm font-medium text-slate-500">Sin registros</p>
+                  <p className="rounded-lg bg-slate-50 px-4 py-6 text-sm font-medium text-slate-500">Sin inspecciones</p>
                 )}
               </div>
             </article>
@@ -617,7 +659,7 @@ export default async function FormatosPage({
                       </div>
                     ))}
                     {visibles.length === 0 ? (
-                      <p className="rounded-lg bg-slate-50 px-4 py-6 text-sm font-medium text-slate-500">Sin registros</p>
+                      <p className="rounded-lg bg-slate-50 px-4 py-6 text-sm font-medium text-slate-500">Sin inspecciones</p>
                     ) : null}
                   </div>
                   {completos.length > visibles.length ? (
