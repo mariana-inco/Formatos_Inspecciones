@@ -69,7 +69,7 @@ export default function DistribucionFormatoDona({ segmentos, total }: Props) {
               onFocus={() => setSegmentoActivo(item)}
               onMouseLeave={() => setSegmentoActivo(null)}
               onBlur={() => setSegmentoActivo(null)}
-              className="cursor-help outline-none transition duration-200 hover:brightness-95 hover:drop-shadow-md focus:brightness-95 focus:drop-shadow-md"
+              className="cursor-pointer outline-none transition duration-200 hover:brightness-95 hover:drop-shadow-md focus:brightness-95 focus:drop-shadow-md"
             />
           ))}
         </svg>

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import Signature from "@uiw/react-signature";
@@ -14,6 +15,7 @@ import {
   ImageUp,
   Settings,
   ShieldCheck,
+  XCircle,
 } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
 import {
@@ -23,7 +25,6 @@ import {
   registrarJsonFinalFormulario,
 } from "../components/jsonFormulario";
 import {
-  decisionOptions as opcionesDecision,
   inspectionTypeKeys as clavesTiposInspeccion,
   inspectionTypes as tiposInspeccion,
 } from "./data";
@@ -176,8 +177,10 @@ const obtenerEstadoVigencia = (proximaInspeccion: string) => {
 };
 const mostrarFecha = (fecha: string) => fecha || "-";
 export default function InspeccionEquiposProteccionContraCaidasForm() {
+  const router = useRouter();
   const [datosGenerales, setDatosGenerales] = useState(datosGeneralesIniciales);
   const [urlVistaPreviaImagen, setUrlVistaPreviaImagen] = useState("");
+  const [imagenDataUrl, setImagenDataUrl] = useState("");
   const [nombreImagen, setNombreImagen] = useState("");
   const [imagenInputKey, setImagenInputKey] = useState(0);
   const [datosRegistrados, setDatosRegistrados] = useState(false);
@@ -314,8 +317,14 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const manejarCargaImagen = (e: ChangeEvent<HTMLInputElement>) => {
     const archivo = e.target.files?.[0];
     if (!archivo) return;
-    setNombreImagen(archivo.name);
-    setUrlVistaPreviaImagen(URL.createObjectURL(archivo));
+    const lector = new FileReader();
+    lector.onload = () => {
+      const dataUrl = String(lector.result || "");
+      setNombreImagen(archivo.name);
+      setImagenDataUrl(dataUrl);
+      setUrlVistaPreviaImagen(dataUrl);
+    };
+    lector.readAsDataURL(archivo);
   };
 
   const obtenerCamposFaltantesDatosEquipo = () => {
@@ -436,9 +445,9 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   };
 
   const limpiarFormularioParaNuevoRegistro = () => {
-    if (urlVistaPreviaImagen) URL.revokeObjectURL(urlVistaPreviaImagen);
     setDatosGenerales(datosGeneralesIniciales);
     setUrlVistaPreviaImagen("");
+    setImagenDataUrl("");
     setNombreImagen("");
     setImagenInputKey((prev) => prev + 1);
     setDatosRegistrados(false);
@@ -477,6 +486,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
         ...datosEquipo,
         imagenEquipo: limpiarImagenParaJson({
           nombreArchivo: nombreImagen,
+          dataUrl: imagenDataUrl,
           carpeta: "evidencias",
           prefijo: `equipo-${tipoInspeccionSeleccionado}`,
         }),
@@ -553,10 +563,85 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
       await respuestaHttp.json();
       limpiarFormularioParaNuevoRegistro();
+      router.refresh();
+      router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
     }
+  };
+
+  const renderSelectorConcepto = (key: string, concepto: ConceptoRevision) => {
+    const opciones: Array<{ value: ConceptoRevision; label: string; icon: typeof Check }> = [
+      { value: "ACEPTADO", label: "Aceptado", icon: Check },
+      { value: "RECHAZADO", label: "Rechazado", icon: XCircle },
+    ];
+
+    const opcionesVisibles = concepto ? opciones.filter((opcion) => opcion.value === concepto) : opciones;
+
+    return (
+      <div data-required-id={`concepto-${key}`} className="grid gap-2 rounded-2xl bg-slate-100 p-1.5 sm:grid-cols-2 md:grid-cols-1" tabIndex={-1}>
+        {opcionesVisibles.map((opcion) => {
+          const seleccionado = concepto === opcion.value;
+          const Icono = opcion.icon;
+          const claseSeleccionada =
+            opcion.value === "ACEPTADO"
+              ? "border-emerald-300 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200"
+              : "border-red-300 bg-red-100 text-red-800 ring-2 ring-red-200";
+
+          return (
+            <button
+              key={`${key}-${opcion.value}`}
+              type="button"
+              aria-pressed={seleccionado}
+              onClick={() => manejarCambioConcepto(key, seleccionado ? "" : opcion.value)}
+              className={`inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-center text-[11px] font-bold uppercase leading-tight tracking-normal shadow-sm transition ${
+                seleccionado ? claseSeleccionada : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-white"
+              }`}
+            >
+              <Icono className="size-4" aria-hidden="true" />
+              {opcion.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderSelectorDecisionFinal = () => {
+    const opciones: Array<{ value: string; label: string; icon: typeof Check }> = [
+      { value: "apto", label: "Apto para ser utilizado", icon: ShieldCheck },
+      { value: "no-apto", label: "No apto para ser utilizado", icon: XCircle },
+    ];
+    const opcionesVisibles = decisionFinal ? opciones.filter((opcion) => opcion.value === decisionFinal) : opciones;
+
+    return (
+      <div data-required-id="decisionFinal" className="mt-2 grid gap-2 rounded-2xl bg-slate-100 p-1.5" tabIndex={-1}>
+        {opcionesVisibles.map((opcion) => {
+          const seleccionado = decisionFinal === opcion.value;
+          const Icono = opcion.icon;
+          const claseSeleccionada =
+            opcion.value === "apto"
+              ? "border-emerald-300 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200"
+              : "border-red-300 bg-red-100 text-red-800 ring-2 ring-red-200";
+
+          return (
+            <button
+              key={opcion.value}
+              type="button"
+              aria-pressed={seleccionado}
+              onClick={() => setDecisionFinal(seleccionado ? "" : opcion.value)}
+              className={`inline-flex min-h-12 w-full min-w-0 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-center text-xs font-bold uppercase leading-tight shadow-sm transition ${
+                seleccionado ? claseSeleccionada : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-white"
+              }`}
+            >
+              <Icono className="size-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0">{opcion.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
   };
 
   const renderizarTablaListaChequeo = (opciones: {
@@ -585,16 +670,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               <div className="mt-4">
                 <label className="text-xs font-bold uppercase tracking-wide text-slate-950">CONCEPTO</label>
                 {opciones.mode === "principal" ? (
-                  <select
-                    data-required-id={`concepto-${item.key}`}
-                    value={concepto}
-                    onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
-                    className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                  >
-                    <option value="">--Seleccione--</option>
-                    <option value="ACEPTADO">ACEPTADO</option>
-                    <option value="RECHAZADO">RECHAZADO</option>
-                  </select>
+                  <div className="mt-2">{renderSelectorConcepto(item.key, concepto)}</div>
                 ) : (
                   <div className="mt-2 flex h-11 w-full items-center rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-bold text-emerald-950 shadow-sm">
                     {concepto || "-"}
@@ -659,16 +735,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   </td>
                   <td className="border-b border-slate-200 px-4 py-4 align-top">
                     {opciones.mode === "principal" ? (
-                      <select
-                        data-required-id={`concepto-${item.key}`}
-                        value={concepto}
-                        onChange={(e) => manejarCambioConcepto(item.key, e.target.value as ConceptoRevision)}
-                        className="mx-auto block h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-center text-xs font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      >
-                        <option value="">--Seleccione--</option>
-                        <option value="ACEPTADO">ACEPTADO</option>
-                        <option value="RECHAZADO">RECHAZADO</option>
-                      </select>
+                      renderSelectorConcepto(item.key, concepto)
                     ) : (
                       <div className="mx-auto flex h-11 w-full items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-bold text-emerald-950 shadow-sm">
                         {concepto || "-"}
@@ -1056,16 +1123,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                     </div>
                     <div>
                       <label className="text-xs font-bold uppercase tracking-wide text-slate-950">DECISIÓN FINAL</label>
-                      <select
-                        name="decisionFinal"
-                        value={decisionFinal}
-                        onChange={manejarCambioCampo}
-                        className="mt-2 block h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-900 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
-                      >
-                        {opcionesDecision.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
+                      {renderSelectorDecisionFinal()}
                     </div>
                   </div>
                 </div>

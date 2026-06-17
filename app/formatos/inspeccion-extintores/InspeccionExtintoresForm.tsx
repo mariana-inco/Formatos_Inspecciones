@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import {
@@ -191,6 +192,7 @@ const serializarFirma = (svg: SVGSVGElement) => {
 };
 
 export default function InspeccionExtintoresForm() {
+  const router = useRouter();
   const [datosInspeccion, setDatosInspeccion] = useState<DatosInspeccion>(datosInspeccionIniciales);
   const [registro, setRegistro] = useState<RegistroExtintor>(registroInicial);
   const [registros, setRegistros] = useState<RegistroExtintor[]>([]);
@@ -366,6 +368,8 @@ export default function InspeccionExtintoresForm() {
       setIndiceEdicion(null);
       referenciaFirma.current?.clear();
       setFirmaTieneTrazo(false);
+      router.refresh();
+      router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");

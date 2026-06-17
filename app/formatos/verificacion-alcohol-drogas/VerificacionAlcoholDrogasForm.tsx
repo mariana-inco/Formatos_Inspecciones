@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import { ClipboardList, Eye, HardHat, PenLine, ShieldCheck, Upload, UserCog, UsersRound } from "lucide-react";
@@ -138,6 +139,7 @@ const serializarFirma = (svg: SVGSVGElement) => {
 };
 
 export default function VerificacionAlcoholDrogasForm() {
+  const router = useRouter();
   const [datos, setDatos] = useState<DatosFormulario>(datosIniciales);
   const [registros, setRegistros] = useState<RegistroPersona[]>([]);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
@@ -438,6 +440,8 @@ export default function VerificacionAlcoholDrogasForm() {
 
       await respuestaHttp.json();
       reiniciarFormularioCompleto();
+      router.refresh();
+      router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");

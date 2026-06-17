@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import {
@@ -209,6 +210,7 @@ const serializarFirma = (svg: SVGSVGElement) => {
 };
 
 export default function InspeccionEppForm() {
+  const router = useRouter();
   const [datos, setDatos] = useState<DatosFormulario>(datosIniciales);
   const [registros, setRegistros] = useState<RegistroEpp[]>([]);
   const [indiceEdicion, setIndiceEdicion] = useState<number | null>(null);
@@ -421,6 +423,8 @@ export default function InspeccionEppForm() {
       }
 
       await response.json();
+      router.refresh();
+      router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
       alert("No se pudo guardar el archivo JSON. Revise la consola para más detalles.");
@@ -630,22 +634,22 @@ export default function InspeccionEppForm() {
                 </div>
                 <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">Califique la condición del EPP</h3>
               </div>
-              <div className="grid gap-4 p-5">
-                <div className="space-y-5">
+              <div className="grid w-full gap-4 px-5 py-5">
+                <div className="w-full space-y-5">
                   {gruposTablaEpp.map((grupo) => (
-                    <section key={grupo.label} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                    <section key={grupo.label} className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                       <div className="bg-emerald-800 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white">
                         {grupo.label}
                       </div>
-                      <div className="grid gap-4 p-4 md:grid-cols-2 2xl:grid-cols-3">
+                      <div className="grid gap-4 p-4 lg:grid-cols-2">
                         {grupo.fields.map((campo) =>
                           campo.key === "otrosEpps" ? (
-                            <div key={campo.key} className="md:col-span-2 2xl:col-span-3">{renderOtrosEpps()}</div>
+                            <div key={campo.key} className="lg:col-span-2">{renderOtrosEpps()}</div>
                           ) : (
-                            <div key={campo.key} className="grid min-h-[92px] gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(120px,1fr)_auto] sm:items-center 2xl:grid-cols-1 2xl:items-start">
+                            <div key={campo.key} className="grid min-h-[92px] min-w-0 gap-3 rounded-md border border-slate-300 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(160px,1fr)_minmax(0,360px)] sm:items-center">
                               <p className="text-xs font-bold uppercase text-slate-950">{campo.label}</p>
                               <div
-                                className="flex w-full flex-wrap gap-1.5 rounded-xl bg-blue-50 p-1 text-[11px] font-semibold text-slate-900 sm:w-fit 2xl:w-full"
+                                className="grid w-full min-w-0 grid-cols-2 gap-2 rounded-xl bg-blue-50 p-1.5 text-xs font-semibold text-slate-900 min-[520px]:grid-cols-4"
                               >
                                 {obtenerOpcionesCondicionVisibles(datos[campo.key] as CondicionEpp).map((opcion) => {
                                   const seleccionado = datos[campo.key] === opcion;
@@ -655,7 +659,7 @@ export default function InspeccionEppForm() {
                                       type="button"
                                       onClick={() => handleCondicionEpp(campo.key, opcion)}
                                       aria-pressed={seleccionado}
-                                      className={`min-w-11 rounded-lg px-3 py-2 transition ${estiloBotonCondicion(opcion, seleccionado)}`}
+                                      className={`min-h-10 min-w-0 rounded-lg px-2 py-2 text-center transition ${estiloBotonCondicion(opcion, seleccionado)}`}
                                     >
                                       {etiquetaCondicion(opcion)}
                                     </button>

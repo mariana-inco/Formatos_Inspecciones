@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardCheck, FileText, ShieldCheck } from "lucide-react";
 import { calcularEstadoRecarga } from "../../../components/estadoRecarga";
+import RegistroContraCaidasDetalle from "./RegistroContraCaidasDetalle";
 
 export const dynamic = "force-dynamic";
 
@@ -86,18 +87,38 @@ const clasificarGradoAlcohol = (grado: unknown) => {
   if (valor < 150) return "Segundo grado";
   return "Tercer grado";
 };
+
+const iconosEquipoPorArchivo: Record<string, string> = {
+  "arnes-de-seguridad.png": "/Iconos/arnes-de-seguridad.png",
+  "autoretract.png": "/Iconos/autoretract.png",
+  "eslingas-de-cinta.png": "/Iconos/eslingas-de-cinta.png",
+  "frenos.png": "/Iconos/frenos.png",
+  "lineadevida.png": "/Iconos/lineadevida.png",
+  "mosqueton.png": "/Iconos/mosqueton.png",
+  "rappel.png": "/Iconos/rappel.png",
+  "tie-off.png": "/Iconos/tie-off.png",
+};
+
+const nombreArchivoAdjunto = (value: any) => {
+  const nombre = value?.fileName || value?.nombreArchivo || value?.fileUrl?.split("/").pop();
+  return typeof nombre === "string" ? nombre : "";
+};
+
 const imagenAdjunta = (value: any) => {
   if (!value) return "";
   if (typeof value === "string") return value;
-  return value.dataUrl || "";
+  if (value.dataUrl) return value.dataUrl;
+  return iconosEquipoPorArchivo[nombreArchivoAdjunto(value)] || "";
 };
 const renderImagenAdjunta = (value: any, label: string) => {
   const url = imagenAdjunta(value);
   if (!url) {
-    if (value?.fileUrl) {
+    const nombreArchivo = nombreArchivoAdjunto(value);
+    if (nombreArchivo) {
       return (
         <div className="max-w-36 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800">
-          Archivo no disponible en el servidor
+          Archivo no disponible
+          <span className="mt-1 block break-all text-amber-700">{nombreArchivo}</span>
         </div>
       );
     }
@@ -127,9 +148,9 @@ const mostrarValor = (value: unknown): React.ReactNode => {
 };
 
 const renderCampo = (label: string, value: unknown) => (
-  <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+  <div key={label} className="min-w-0 rounded-lg border border-slate-200 bg-white px-4 py-3">
     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-    <div className="mt-2 text-sm font-semibold leading-6 text-slate-900">{mostrarValor(value)}</div>
+    <div className="mt-2 min-w-0 break-words text-sm font-semibold leading-6 text-slate-900 [overflow-wrap:anywhere]">{mostrarValor(value)}</div>
   </div>
 );
 
@@ -210,7 +231,7 @@ const renderListaChequeo = (registro: any) => {
                     <div>
                       <p className="text-sm font-bold text-slate-950">{item.criterio || "Ítem sin criterio"}</p>
                     </div>
-                    <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
+                    <span className={`inline-flex w-fit whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
                     <p className="text-sm font-medium leading-6 text-slate-600">{item.observaciones || "Sin observaciones"}</p>
                   </div>
                 );
@@ -230,7 +251,7 @@ const renderListaChequeo = (registro: any) => {
                 <div key={item.numeroRegistro} className="rounded-lg bg-slate-50 px-4 py-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <p className="text-sm font-bold text-slate-950">{item.cual || `Otro ${item.numeroRegistro}`}</p>
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
+                    <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
                   </div>
                   <p className="mt-2 text-sm font-medium text-slate-600">{item.observaciones || "Sin observaciones"}</p>
                 </div>
@@ -307,7 +328,7 @@ const renderAlcoholDrogas = (registro: any) => {
                     <td className="px-4 py-4 font-semibold text-slate-800">{texto(persona.empresaContratista)}</td>
                     <td className="px-4 py-4 font-semibold text-slate-800">{texto(persona.cargo)}</td>
                     <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${claseResultado(persona.resultadoPrimeraPruebaInicial)}`}>
+                      <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseResultado(persona.resultadoPrimeraPruebaInicial)}`}>
                         {texto(persona.resultadoPrimeraPruebaInicial)}
                       </span>
                       <p className="mt-2 text-xs font-semibold text-slate-600">{texto(persona.gradoDetectadoMg100ml, "0")} mg / 100ml</p>
@@ -316,7 +337,7 @@ const renderAlcoholDrogas = (registro: any) => {
                     <td className="px-4 py-4">
                       {persona.resultadoSegundaPruebaConfirmatoria ? (
                         <>
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${claseResultado(persona.resultadoSegundaPruebaConfirmatoria)}`}>
+                          <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseResultado(persona.resultadoSegundaPruebaConfirmatoria)}`}>
                             {texto(persona.resultadoSegundaPruebaConfirmatoria)}
                           </span>
                           <p className="mt-2 text-xs font-semibold text-slate-600">{texto(persona.gradoDetectadoSegundaPruebaMg100ml, "0")} mg / 100ml</p>
@@ -345,6 +366,71 @@ const renderAlcoholDrogas = (registro: any) => {
           </table>
         </div>
         {registros.length === 0 ? <p className="px-5 py-6 text-sm font-semibold text-slate-500">No hay personas evaluadas registradas.</p> : null}
+      </section>
+    </div>
+  );
+};
+
+const renderEpp = (registro: any) => {
+  const datosGenerales = registro.datosGenerales || {};
+  const registros = registro.registros || [];
+
+  return (
+    <div className="space-y-6">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Fecha de registro", registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10)],
+          ["Fecha inspección", datosGenerales.fechaInspeccion],
+          ["Lugar", datosGenerales.lugar],
+          ["Área de trabajo", datosGenerales.areaTrabajo],
+          ["Total registros", registro.totalRegistros || registros.length],
+        ].map(([label, value]) => renderCampo(String(label), value))}
+      </section>
+
+      <section className="space-y-5">
+        {registros.map((item: any, index: number) => {
+          const colaborador = item.colaborador || item.trabajador || {};
+          const condiciones = [...(item.condicionesEpp || []), ...(item.otrosEpps?.detalle || [])];
+          const firma = item.firmas?.firmaColaborador || item.firmaColaborador || item.firma;
+
+          return (
+            <article key={item.numeroRegistro || index} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Registro {item.numeroRegistro || index + 1}</p>
+                    <h2 className="mt-1 text-lg font-bold text-slate-950">{texto(colaborador.nombre || item.nombreColaborador, "Colaborador")}</h2>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">{texto(colaborador.cargo || item.cargoTrabajador, "Sin cargo")}</p>
+                  </div>
+                  <div className="w-full max-w-xs">{renderImagenAdjunta(firma, `Firma colaborador ${index + 1}`)}</div>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-5">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {condiciones.map((condicion: any, condicionIndex: number) => {
+                    const estado = estadoRevisionExtintor({ estadoId: condicion.condicionId });
+                    return (
+                      <div key={condicion.key || condicion.cual || condicionIndex} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <p className="min-w-0 text-sm font-bold text-slate-950">{texto(condicion.epp || condicion.cual || condicion.nombre, `Elemento ${condicionIndex + 1}`)}</p>
+                          <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {item.observaciones ? (
+                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Observaciones</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-800">{item.observaciones}</p>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
       </section>
     </div>
   );
@@ -403,7 +489,7 @@ const renderExtintores = (registro: any) => {
                       Extintor {texto(identificacion.numeroExtintor, `${index + 1}`)}
                     </h2>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(recarga.severidad)}`}>{recarga.estado}</span>
+                  <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(recarga.severidad)}`}>{recarga.estado}</span>
                 </div>
               </div>
 
@@ -426,7 +512,7 @@ const renderExtintores = (registro: any) => {
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Estado de recarga</p>
                       <p className="mt-2 text-sm font-semibold text-slate-700">{recarga.mensaje}</p>
                     </div>
-                    <span className={`rounded-full px-4 py-2 text-sm font-bold ${claseRecarga(recarga.severidad)}`}>{recarga.estado}</span>
+                    <span className={`inline-flex whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold ${claseRecarga(recarga.severidad)}`}>{recarga.estado}</span>
                   </div>
                 </div>
 
@@ -459,7 +545,7 @@ const renderExtintores = (registro: any) => {
                           <tr key={revision.key || revision.criterio}>
                             <td className="px-4 py-3 font-semibold text-slate-900">{texto(revision.criterio || revision.key)}</td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
+                              <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${estado.className}`}>{estado.label}</span>
                             </td>
                           </tr>
                         );
@@ -532,7 +618,11 @@ export default async function RegistroDiligenciadoPage({ params }: PageProps) {
           ].map(([label, value]) => renderCampo(String(label), value))}
         </section>
 
-        {codigo === "HSE-F010" ? (
+        {codigo === "HSE-F006" ? (
+          <RegistroContraCaidasDetalle registro={registro} />
+        ) : codigo === "HSE-F002" ? (
+          renderEpp(registro)
+        ) : codigo === "HSE-F010" ? (
           renderListaChequeo(registro)
         ) : codigo === "HSE-F020" ? (
           renderAlcoholDrogas(registro)

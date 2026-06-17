@@ -104,6 +104,19 @@ const agruparDetalles = (detalles: DetalleRegistroModulo[]) =>
     return acc;
   }, {});
 
+const formatearHoraRegistro = (fechaCreacionMs?: number) => {
+  if (!fechaCreacionMs) return "";
+  const fecha = new Date(fechaCreacionMs);
+  if (Number.isNaN(fecha.getTime())) return "";
+  return new Intl.DateTimeFormat("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })
+    .format(fecha)
+    .toUpperCase();
+};
+
 export default function InspeccionesRecientes({ registros }: Props) {
   const [registroActivo, setRegistroActivo] = useState<RegistroModulo | null>(null);
   const detallePrincipal = registroActivo ? obtenerDetallePrincipal(registroActivo) : null;
@@ -115,23 +128,30 @@ export default function InspeccionesRecientes({ registros }: Props) {
         <h2 className="text-lg font-bold text-slate-950">Inspecciones recientes</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="min-w-[1320px] w-full text-sm">
           <thead className="bg-white text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-5 py-4">Código</th>
-              <th className="px-5 py-4">Fecha</th>
-              <th className="px-5 py-4">Formato</th>
-              <th className="px-5 py-4">Sede / Área</th>
-              <th className="px-5 py-4">Responsable / Inspector</th>
-              <th className="px-5 py-4">Estado general</th>
+              <th className="w-32 px-5 py-4">Código</th>
+              <th className="w-36 px-5 py-4">Fecha</th>
+              <th className="min-w-80 px-5 py-4">Formato</th>
+              <th className="min-w-64 px-5 py-4">Sede / Área</th>
+              <th className="min-w-80 px-5 py-4">Responsable / Inspector</th>
+              <th className="min-w-36 px-5 py-4">Estado general</th>
               <th className="px-5 py-4">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {registros.map((registro, index) => (
               <tr key={`${registro.codigo}-${registro.fecha}-${index}`} className="hover:bg-slate-50/70">
-                <td className="px-5 py-4 font-bold text-slate-950">{registro.codigo}</td>
-                <td className="px-5 py-4 font-medium text-slate-600">{registro.fecha}</td>
+                <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-950">{registro.codigo}</td>
+                <td className="px-5 py-4">
+                  <div className="inline-flex flex-col whitespace-nowrap">
+                    <span className="font-medium text-slate-700">{registro.fecha}</span>
+                    {formatearHoraRegistro(registro.fechaCreacionMs) ? (
+                      <span className="mt-1 text-xs font-bold text-slate-500">{formatearHoraRegistro(registro.fechaCreacionMs)}</span>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
                     <div className="grid size-9 place-items-center rounded-lg bg-[#E8F5E9] text-[#006948]">
@@ -143,25 +163,27 @@ export default function InspeccionesRecientes({ registros }: Props) {
                     </div>
                   </div>
                 </td>
-                <td className="px-5 py-4 font-medium text-slate-600">{registro.sedeArea}</td>
-                <td className="px-5 py-4">
+                <td className="px-5 py-4 font-medium text-slate-600">
+                  <span className="block min-w-0 break-words [overflow-wrap:anywhere]">{registro.sedeArea}</span>
+                </td>
+                <td className="min-w-0 px-5 py-4">
                   <div className="flex items-center gap-3">
                     <div className="grid size-8 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
                       {registro.responsable.slice(0, 1).toUpperCase() || "H"}
                     </div>
-                    <span className="font-medium text-slate-700">{registro.responsable}</span>
+                    <span className="min-w-0 break-words font-medium text-slate-700 [overflow-wrap:anywhere]">{registro.responsable}</span>
                   </div>
                 </td>
-                <td className="px-5 py-4">
+                <td className="px-5 py-4 text-center">
                   {registro.codigo === "HSE-F003" && registro.recarga ? (
-                    <div className="inline-flex flex-col items-start gap-1">
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registro.recarga.severidad)}`}>
+                    <div className="inline-flex min-w-36 flex-col items-center gap-1">
+                      <span className={`inline-flex min-w-20 justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registro.recarga.severidad)}`}>
                         {registro.recarga.estado}
                       </span>
-                      <span className="text-[11px] font-semibold leading-tight text-slate-500">{detalleCortoRecarga(registro)}</span>
+                      <span className="text-center text-[11px] font-semibold leading-tight text-slate-500">{detalleCortoRecarga(registro)}</span>
                     </div>
                   ) : (
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                    <span className={`inline-flex min-w-28 justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
                       {registro.estado}
                     </span>
                   )}
@@ -219,7 +241,7 @@ export default function InspeccionesRecientes({ registros }: Props) {
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-                    <p className="mt-2 text-sm font-bold text-slate-950">{value}</p>
+                    <p className="mt-2 min-w-0 break-words text-sm font-bold text-slate-950 [overflow-wrap:anywhere]">{value}</p>
                   </div>
                 ))}
               </div>
@@ -232,11 +254,11 @@ export default function InspeccionesRecientes({ registros }: Props) {
                       <p className="mt-1 text-sm font-medium text-slate-500">{detallePrincipal.descripcion}</p>
                     </div>
                     {registroActivo.codigo === "HSE-F003" && registroActivo.recarga ? (
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registroActivo.recarga.severidad)}`}>
+                      <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registroActivo.recarga.severidad)}`}>
                         {detalleCortoRecarga(registroActivo)}
                       </span>
                     ) : (
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registroActivo.estado)}`}>
+                      <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registroActivo.estado)}`}>
                         {registroActivo.novedades} novedad{registroActivo.novedades === 1 ? "" : "es"}
                       </span>
                     )}
@@ -252,7 +274,7 @@ export default function InspeccionesRecientes({ registros }: Props) {
                           <div key={`${grupo}-${detalle.item}-${index}`} className="rounded-lg bg-slate-50 px-4 py-3">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <p className="min-w-0 flex-1 text-sm font-semibold text-slate-800">{detalle.item}</p>
-                              <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${claseDetalle(detalle.estado)}`}>
+                              <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-bold ${claseDetalle(detalle.estado)}`}>
                                 {detalle.estado}
                               </span>
                             </div>

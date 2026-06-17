@@ -40,7 +40,7 @@ export type DetalleRegistroModulo = {
 };
 
 const fuentes = [
-  { codigo: "HSE-F006", dir: "inspeccion-contra-caidas", ruta: "/formatos/inspeccion-equipos-proteccion-contra-caidas" },
+  { codigo: "HSE-F006", dir: "inspeccion-equipos-proteccion-contra-caidas", ruta: "/formatos/inspeccion-equipos-proteccion-contra-caidas" },
   { codigo: "HSE-F002", dir: "inspeccion-epp", ruta: "/formatos/inspeccion-epp" },
   { codigo: "HSE-F020", dir: "verificacion-alcohol-drogas", ruta: "/formatos/verificacion-alcohol-drogas" },
   { codigo: "HSE-F003", dir: "inspeccion-extintores", ruta: "/formatos/inspeccion-extintores" },
@@ -321,50 +321,6 @@ const cargarRegistrosModulo = async () => {
   return registros.flat().sort((a, b) => (b.fechaCreacionMs || 0) - (a.fechaCreacionMs || 0) || String(b.fecha).localeCompare(String(a.fecha)));
 };
 
-const prioridadEstado: Record<RegistroModulo["estado"], number> = {
-  "Con novedad": 4,
-  Regular: 3,
-  Pendiente: 2,
-  Conforme: 1,
-};
-
-const prioridadRecarga: Record<EstadoRecarga["severidad"], number> = {
-  malo: 5,
-  critico: 4,
-  regular: 3,
-  pendiente: 2,
-  bueno: 1,
-};
-
-const consolidarRegistrosRecientes = (registros: RegistroModulo[]) =>
-  Array.from(
-    registros
-      .reduce<Map<string, RegistroModulo>>((acc, registro) => {
-        const existente = acc.get(registro.detalleUrl);
-        if (!existente) {
-          acc.set(registro.detalleUrl, registro);
-          return acc;
-        }
-
-        const estado = prioridadEstado[registro.estado] > prioridadEstado[existente.estado] ? registro.estado : existente.estado;
-        const recarga =
-          registro.recarga && (!existente.recarga || prioridadRecarga[registro.recarga.severidad] > prioridadRecarga[existente.recarga.severidad])
-            ? registro.recarga
-            : existente.recarga;
-
-        acc.set(registro.detalleUrl, {
-          ...existente,
-          estado,
-          recarga,
-          novedades: existente.novedades + registro.novedades,
-          busqueda: `${existente.busqueda} ${registro.busqueda}`,
-          detalles: [...existente.detalles, ...registro.detalles],
-        });
-        return acc;
-      }, new Map())
-      .values()
-  ).sort((a, b) => (b.fechaCreacionMs || 0) - (a.fechaCreacionMs || 0) || String(b.fecha).localeCompare(String(a.fecha)));
-
 const claseEstado = (estado: string) => {
   if (estado === "Conforme") return "bg-[#E8F5E9] text-[#006948]";
   if (estado === "Con novedad") return "bg-[#FFEBEE] text-red-700";
@@ -440,7 +396,7 @@ export default async function FormatosPage({
     const coincideHasta = !rangoPeriodo.hasta || registro.fecha <= rangoPeriodo.hasta;
     return coincideBusqueda && coincideFormato && coincideEstado && coincideDesde && coincideHasta;
   });
-  const registrosRecientes = consolidarRegistrosRecientes(registrosFiltrados).slice(0, 10);
+  const registrosRecientes = registrosFiltrados.slice(0, 10);
   const mesActual = new Date().toISOString().slice(0, 7);
   const total = registrosFiltrados.length;
   const inspeccionesMes = registrosFiltrados.filter((registro) => registro.fecha.startsWith(mesActual)).length;
