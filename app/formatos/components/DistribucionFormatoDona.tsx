@@ -55,8 +55,8 @@ export default function DistribucionFormatoDona({ segmentos, total }: Props) {
   const detalle = segmentoActivo || segmentoPrincipal;
 
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-4 py-4">
-      <div className="relative mx-auto size-56">
+    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-4 sm:px-4">
+      <div className="relative mx-auto size-44 sm:size-56">
         <svg viewBox="0 0 220 220" className="size-full" role="img" aria-label="Distribución de inspecciones por formato">
           {segmentos.map((item, index) => (
             <path
@@ -74,9 +74,9 @@ export default function DistribucionFormatoDona({ segmentos, total }: Props) {
           ))}
         </svg>
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <div className="grid size-24 place-items-center rounded-full bg-white text-center shadow-sm ring-1 ring-slate-100">
+          <div className="grid size-20 place-items-center rounded-full bg-white text-center shadow-sm ring-1 ring-slate-100 sm:size-24">
             <div>
-              <p className="text-3xl font-bold text-slate-950">{total}</p>
+              <p className="text-2xl font-bold text-slate-950 sm:text-3xl">{total}</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Inspecciones</p>
             </div>
           </div>
@@ -84,12 +84,12 @@ export default function DistribucionFormatoDona({ segmentos, total }: Props) {
       </div>
 
       {detalle ? (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-center shadow-sm">
+        <div className="mt-3 min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-3 text-center shadow-sm">
           <div className="flex items-center justify-center gap-2">
-            <span className="size-2.5 rounded-full" style={{ backgroundColor: detalle.color }} />
+            <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: detalle.color }} />
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{detalle.codigo}</p>
           </div>
-          <p className="mt-1 truncate text-sm font-bold text-slate-950">{detalle.nombreCorto}</p>
+          <p className="mt-1 min-w-0 break-words text-sm font-bold leading-5 text-slate-950 [overflow-wrap:anywhere]">{detalle.nombreCorto}</p>
           <p className="mt-1 text-xs font-bold text-[#006948]">
             {detalle.value} registro{detalle.value === 1 ? "" : "s"} · {detalle.porcentaje}%
           </p>

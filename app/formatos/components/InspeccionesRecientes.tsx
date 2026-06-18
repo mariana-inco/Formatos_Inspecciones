@@ -77,7 +77,10 @@ const obtenerDetallePrincipal = (registro: RegistroModulo) => {
   if (registro.estado === "Con novedad") {
     return {
       titulo: "Novedades encontradas",
-      descripcion: "Este registro requiere revisión. Se muestran únicamente los ítems marcados con novedad.",
+      descripcion:
+        registro.codigo === "HSE-F006"
+          ? "Este registro requiere revisión. Se muestran los factores del checklist marcados como rechazados."
+          : "Este registro requiere revisión. Se muestran únicamente los ítems marcados con novedad.",
       items: registro.detalles.filter((detalle) => detalle.estado === "Con novedad"),
     };
   }

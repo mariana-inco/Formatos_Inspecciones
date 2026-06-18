@@ -116,6 +116,7 @@ const camposFirmaSinNumeros = new Set<keyof DatosFirma>([
   "responsableNombre",
   "responsableCargo",
 ]);
+const camposDatosEquipoNumericos = new Set(["numeroSerie", "numeroInterno"]);
 
 const etiquetasBotonesInspeccion: Record<ClaveTipoInspeccion, string> = {
   arnes: "INSPECCIÓN ARNÉS",
@@ -310,7 +311,8 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
   const manejarCambioCampo = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target as HTMLInputElement;
-    setDatosGenerales((prev) => ({ ...prev, [name]: value }));
+    const siguienteValor = camposDatosEquipoNumericos.has(name) ? soloNumeros(value) : value;
+    setDatosGenerales((prev) => ({ ...prev, [name]: siguienteValor }));
     if (name === "decisionFinal") setDecisionFinal(value);
   };
 
@@ -924,11 +926,11 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Número de serie {marcaObligatorio}</label>
-                    <input name="numeroSerie" value={datosGenerales.numeroSerie} onChange={manejarCambioCampo} placeholder="Ej: 454580104" className={claseCampoTexto} />
+                    <input name="numeroSerie" value={datosGenerales.numeroSerie} onChange={manejarCambioCampo} placeholder="Ej: 454580104" inputMode="numeric" pattern="[0-9]*" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Número interno {marcaObligatorio}</label>
-                    <input name="numeroInterno" value={datosGenerales.numeroInterno} onChange={manejarCambioCampo} placeholder="Ej: N/A" className={claseCampoTexto} />
+                    <input name="numeroInterno" value={datosGenerales.numeroInterno} onChange={manejarCambioCampo} placeholder="Ej: 100245" inputMode="numeric" pattern="[0-9]*" className={claseCampoTexto} />
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-slate-700">Certificado</label>

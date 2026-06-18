@@ -30,7 +30,7 @@ export const calcularEstadoRecarga = (fechaProximaRecarga?: string | null): Esta
       severidad: "pendiente",
       dias: null,
       mensaje: "Sin fecha próxima de recarga registrada.",
-    };
+    }; 
   }
 
   const hoy = normalizarFechaLocal(new Date());

@@ -62,6 +62,17 @@ const contar = (items: string[]) =>
     .sort(([, a], [, b]) => b - a)
     .map(([label, value]) => ({ label, value }));
 
+const sumarPor = (items: RegistroModulo[], obtenerLabel: (item: RegistroModulo) => string, obtenerValor: (item: RegistroModulo) => number) =>
+  Object.entries(
+    items.reduce<Record<string, number>>((acc, item) => {
+      const label = obtenerLabel(item) || "Sin dato";
+      acc[label] = (acc[label] || 0) + obtenerValor(item);
+      return acc;
+    }, {})
+  )
+    .sort(([, a], [, b]) => b - a)
+    .map(([label, value]) => ({ label, value }));
+
 type RespuestaJsonModulo = Record<string, any> & {
   __archivo: string;
 };
@@ -159,10 +170,26 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
 
   if (codigo === "HSE-F006") {
     const decision = registro.cierreInspeccion?.decisionFinalId;
-    const estado = decision === 1 ? "Conforme" : decision === 2 ? "Con novedad" : "Pendiente";
+    const detallesChecklist: DetalleRegistroModulo[] = (registro.respuestasChecklist || []).map((item: any, itemIndex: number) => ({
+      grupo: textoSeguro(registro.inspeccion?.nombre, "Checklist contra caídas"),
+      item: textoSeguro(item.factor, `Factor ${itemIndex + 1}`),
+      estado: item.conceptoId === 2 ? "Con novedad" : item.conceptoId === 1 ? "Conforme" : "Pendiente",
+      observaciones: item.comentario || item.detalleApoyo || item.instrucciones,
+    }));
+    const novedadesChecklist = detallesChecklist.filter((detalle) => detalle.estado === "Con novedad").length;
+    const estado = novedadesChecklist > 0 || decision === 2 ? "Con novedad" : decision === 1 ? "Conforme" : "Pendiente";
+    const detallesFallback: DetalleRegistroModulo[] = [
+      {
+        grupo: "Decisión final",
+        item: decision === 2 ? "Equipo no apto para ser utilizado" : decision === 1 ? "Equipo apto para ser utilizado" : "Inspección pendiente de cierre",
+        estado,
+        observaciones: registro.cierreInspeccion?.comentariosFinales,
+      },
+    ];
     const sedeArea = sedeAreaValida(registro.inspeccion?.nombre);
     const responsable = registro.registro?.usuarioEmail || "-";
     const fecha = registro.datosEquipo?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
+    const detalles = detallesChecklist.length > 0 ? detallesChecklist : detallesFallback;
     return [
       {
         ...base,
@@ -170,16 +197,18 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
         responsable,
         sedeArea,
         estado,
-        novedades: decision === 2 ? 1 : 0,
-        detalles: [
-          {
-            grupo: "Cierre de inspección",
-            item: decision === 2 ? "Inspección cerrada con novedad" : decision === 1 ? "Inspección cerrada conforme" : "Inspección pendiente de cierre",
-            estado,
-            observaciones: registro.cierreInspeccion?.comentariosFinales,
-          },
-        ],
-        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, registro.datosEquipo?.numeroInterno, registro.datosEquipo?.numeroSerie, registro.cierreInspeccion?.comentariosFinales]),
+        novedades: novedadesChecklist || (decision === 2 ? 1 : 0),
+        detalles,
+        busqueda: unirBusqueda([
+          codigo,
+          nombreFormato(codigo),
+          sedeArea,
+          responsable,
+          registro.datosEquipo?.numeroInterno,
+          registro.datosEquipo?.numeroSerie,
+          registro.cierreInspeccion?.comentariosFinales,
+          ...(registro.respuestasChecklist || []).flatMap((item: any) => [item.factor, item.comentario, item.concepto]),
+        ]),
       },
     ];
   }
@@ -440,14 +469,19 @@ export default async function FormatosPage({
   const inspeccionesMetricas = inspecciones.filter(filtrarRegistro);
   const registrosRecientes = registrosFiltrados.slice(0, 10);
   const mesActual = new Date().toISOString().slice(0, 7);
-  const total = inspeccionesMetricas.length;
+  const totalInspecciones = inspecciones.length;
   const inspeccionesMes = inspeccionesMetricas.filter((registro) => registro.fechaCreacion.startsWith(mesActual)).length;
   const conformes = inspeccionesMetricas.filter((registro) => registro.estado === "Conforme").length;
-  const novedades = inspeccionesMetricas.filter((registro) => registro.estado === "Con novedad").length;
+  const inspeccionesConNovedad = inspeccionesMetricas.filter((registro) => registro.estado === "Con novedad").length;
+  const novedadesDetectadas = inspeccionesMetricas.reduce((acc, registro) => acc + registro.novedades, 0);
   const hayFiltrosActivos = Boolean(filtroBusqueda || filtroFormato || filtroEstado || periodo !== "hoy");
   const sinResultadosPorFiltro = inspecciones.length > 0 && inspeccionesMetricas.length === 0 && hayFiltrosActivos;
   const porFormatoCompleto = contar(inspeccionesMetricas.map((registro) => registro.codigo));
-  const novedadesPorFormatoCompleto = contar(inspeccionesMetricas.filter((registro) => registro.novedades > 0).map((registro) => registro.codigo));
+  const novedadesPorFormatoCompleto = sumarPor(
+    inspeccionesMetricas.filter((registro) => registro.novedades > 0),
+    (registro) => registro.codigo,
+    (registro) => registro.novedades
+  );
   const porSedeAreaCompleto = contar(inspeccionesMetricas.map((registro) => registro.sedeArea));
   const porFormato = porFormatoCompleto.slice(0, 5);
   const novedadesPorFormato = novedadesPorFormatoCompleto.slice(0, 5);
@@ -464,7 +498,7 @@ export default async function FormatosPage({
   });
   const tendencia = meses.map((mes) => {
     const registrosMes = inspeccionesMetricas.filter((registro) => registro.fechaCreacion.startsWith(mes.key));
-    return { mes: mes.label, realizadas: registrosMes.length, novedades: registrosMes.filter((registro) => registro.estado === "Con novedad").length };
+    return { mes: mes.label, realizadas: registrosMes.length, novedades: registrosMes.reduce((acc, registro) => acc + registro.novedades, 0) };
   });
   const maxTendencia = Math.max(...tendencia.flatMap((item) => [item.realizadas, item.novedades]), 1);
   const tendenciaVisual = tendencia.map((item) => ({
@@ -488,30 +522,31 @@ export default async function FormatosPage({
   });
   const formatosConDistribucion = distribucionFormato.filter((item) => item.value > 0);
   const totalDistribucion = formatosConDistribucion.reduce((acc, item) => acc + item.value, 0);
-  let acumuladoDistribucion = 0;
-  const segmentosDistribucion = formatosConDistribucion.map((item) => {
-    const inicio = acumuladoDistribucion;
+  const segmentosDistribucion = formatosConDistribucion.reduce<Array<(typeof formatosConDistribucion)[number] & { porcentaje: number; inicio: number; fin: number }>>((acc, item) => {
+    const inicio = acc[acc.length - 1]?.fin || 0;
     const fin = inicio + (item.value / Math.max(totalDistribucion, 1)) * 100;
-    acumuladoDistribucion = fin;
-    return {
+    return [
+      ...acc,
+      {
       ...item,
       porcentaje: Math.round((item.value / Math.max(totalDistribucion, 1)) * 100),
       inicio,
       fin,
-    };
-  });
+      },
+    ];
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FF] text-slate-950">
+    <div className="min-h-screen overflow-x-hidden bg-[#F8F9FF] text-slate-950">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-3 sm:px-8 lg:px-10">
-          <Link href="/formatos" className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-md bg-[#006948] text-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-8 lg:px-10">
+          <Link href="/formatos" className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[#006948] text-white">
               <ShieldCheck className="size-5" aria-hidden="true" />
             </span>
-            <span className="text-base font-bold text-slate-950">Inspecciones HSE</span>
+            <span className="min-w-0 text-sm font-bold leading-tight text-slate-950 sm:text-base">Inspecciones HSE</span>
           </Link>
-          <nav className="flex items-center gap-2 text-sm font-bold">
+          <nav className="flex min-w-0 max-w-full items-center gap-1 overflow-x-auto text-xs font-bold sm:gap-2 sm:text-sm">
             {[
               { href: "/formatos", label: "Dashboard", active: vistaActiva === "dashboard", icon: LayoutDashboard },
               { href: "/formatos?vista=formatos", label: "Formatos", active: vistaActiva === "formatos", icon: FileText },
@@ -521,7 +556,7 @@ export default async function FormatosPage({
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 transition ${
+                  className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-3 transition sm:gap-2 sm:px-4 ${
                     item.active ? "border-[#006948] text-[#006948]" : "border-transparent text-slate-600 hover:text-slate-950"
                   }`}
                 >
@@ -534,12 +569,12 @@ export default async function FormatosPage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-5 py-6 sm:px-8 lg:px-10">
+      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-8 lg:px-10">
         {vistaActiva === "dashboard" ? (
           <>
           <section>
             <p className="text-sm font-medium text-slate-500">Módulo de Inspecciones</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Dashboard Inspecciones HSE</h1>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Dashboard Inspecciones HSE</h1>
           </section>
 
           <DashboardFiltros
@@ -555,25 +590,31 @@ export default async function FormatosPage({
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
-              { title: "Total inspecciones", value: sinResultadosPorFiltro ? "Sin datos" : total, meta: "Módulo HSE", tone: "text-slate-700", bg: "bg-slate-100" },
+              { title: "Total inspecciones", value: totalInspecciones, meta: "Módulo HSE", tone: "text-slate-700", bg: "bg-slate-100" },
               { title: "Inspecciones del mes", value: sinResultadosPorFiltro ? "Sin datos" : inspeccionesMes, meta: "Mes actual", tone: "text-slate-700", bg: "bg-slate-100" },
               { title: "Inspecciones conformes", value: sinResultadosPorFiltro ? "Sin datos" : conformes, meta: "Normalizadas", tone: "text-[#006948]", bg: "bg-[#E8F5E9]" },
-              { title: "Inspecciones con novedades", value: sinResultadosPorFiltro ? "Sin datos" : novedades, meta: "Revisar", tone: "text-red-700", bg: "bg-[#FFEBEE]" },
+              {
+                title: "Inspecciones con novedades",
+                value: sinResultadosPorFiltro ? "Sin datos" : inspeccionesConNovedad,
+                meta: sinResultadosPorFiltro ? "Hallazgos" : `${novedadesDetectadas} ${novedadesDetectadas === 1 ? "hallazgo" : "hallazgos"}`,
+                tone: "text-red-700",
+                bg: "bg-[#FFEBEE]",
+              },
             ].map((item) => (
-              <article key={item.title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
+              <article key={item.title} className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{item.title}</p>
                     <p className="mt-3 text-3xl font-bold text-slate-950">{item.value}</p>
                   </div>
-                  <span className={`inline-flex min-w-24 shrink-0 items-center justify-center rounded-full px-4 py-2 text-center text-xs font-bold whitespace-nowrap ${item.bg} ${item.tone}`}>{item.meta}</span>
+                  <span className={`inline-flex min-w-0 shrink-0 items-center justify-center rounded-full px-4 py-2 text-center text-xs font-bold whitespace-nowrap ${item.bg} ${item.tone}`}>{item.meta}</span>
                 </div>
               </article>
             ))}
           </section>
 
-          <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-slate-950">Inspecciones por mes</h2>
@@ -581,13 +622,13 @@ export default async function FormatosPage({
                 </div>
                 <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
                   <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-[#006948]" />Realizadas</span>
-                  <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-[#F87171]" />Novedades</span>
+                  <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-[#F87171]" />Hallazgos</span>
                   <span className="inline-flex items-center gap-2"><span className="size-2.5 rounded-full bg-slate-300" />Sin inspecciones</span>
                 </div>
               </div>
-              {total > 0 ? (
-                <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50/60 px-5 pb-4 pt-5">
-                  <div className="flex h-64 items-end justify-between gap-4 border-b border-slate-200">
+              {inspeccionesMetricas.length > 0 ? (
+                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-100 bg-slate-50/60 px-4 pb-4 pt-5 sm:px-5">
+                  <div className="flex h-64 min-w-[520px] items-end justify-between gap-4 border-b border-slate-200">
                     {tendenciaVisual.map((item) => (
                       <div key={item.mes} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                         <div className="flex flex-1 items-end justify-center gap-2">
@@ -620,7 +661,7 @@ export default async function FormatosPage({
               )}
             </article>
 
-            <article className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-950">Distribución por formato</h2>
                 <p className="mt-1 text-sm font-medium text-slate-500">Participación de inspecciones creadas según filtros activos.</p>
@@ -635,16 +676,16 @@ export default async function FormatosPage({
             </article>
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-3">
+          <section className="grid min-w-0 gap-6 xl:grid-cols-3">
             {[
               ["Inspecciones por formato", porFormato, maxFormato, porFormatoCompleto],
-              ["Novedades por formato", novedadesPorFormato, maxNovedades, novedadesPorFormatoCompleto],
+              ["Hallazgos por formato", novedadesPorFormato, maxNovedades, novedadesPorFormatoCompleto],
               ["Inspecciones por sede o área", porSedeArea, maxSedeArea, porSedeAreaCompleto],
             ].map(([title, items, max, allItems]) => {
               const visibles = items as Array<{ label: string; value: number }>;
               const completos = allItems as Array<{ label: string; value: number }>;
               return (
-                <article key={String(title)} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <article key={String(title)} className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                   <h2 className="text-base font-bold text-slate-950">{String(title)}</h2>
                   <div className="mt-4 space-y-3">
                     {visibles.map((item) => (
