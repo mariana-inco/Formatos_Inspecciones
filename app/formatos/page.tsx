@@ -614,7 +614,7 @@ export default async function FormatosPage({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-8 lg:px-10">
+      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-6 sm:px-8 lg:px-10">
         {vistaActiva === "dashboard" ? (
           <>
           <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

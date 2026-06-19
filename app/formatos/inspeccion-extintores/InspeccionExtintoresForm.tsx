@@ -386,7 +386,7 @@ export default function InspeccionExtintoresForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-slate-50 px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-6 sm:px-6 lg:px-10">
       <div className="w-full max-w-full">
         <header className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
           <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">

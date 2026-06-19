@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardCheck, FileText, ShieldCheck } from "lucide-react";
 import { calcularEstadoRecarga } from "../../../components/estadoRecarga";
+import ImagenAdjuntaModal from "./ImagenAdjuntaModal";
 import RegistroContraCaidasDetalle from "./RegistroContraCaidasDetalle";
 
 export const dynamic = "force-dynamic";
@@ -129,6 +130,22 @@ const renderImagenAdjunta = (value: any, label: string) => {
       <img src={url} alt={label} className="h-full w-full object-contain" />
     </div>
   );
+};
+const renderBotonImagenAdjunta = (value: any, label: string) => {
+  const url = imagenAdjunta(value);
+  if (!url) {
+    const nombreArchivo = nombreArchivoAdjunto(value);
+    if (nombreArchivo) {
+      return (
+        <div className="max-w-40 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800">
+          Archivo no disponible
+          <span className="mt-1 block break-all text-amber-700">{nombreArchivo}</span>
+        </div>
+      );
+    }
+    return <span className="text-slate-400">Sin adjunto</span>;
+  }
+  return <ImagenAdjuntaModal url={url} nombre={nombreArchivoAdjunto(value) || label} />;
 };
 
 const mostrarValor = (value: unknown): React.ReactNode => {
@@ -347,7 +364,7 @@ const renderAlcoholDrogas = (registro: any) => {
                         <span className="text-slate-400">No aplica</span>
                       )}
                     </td>
-                    <td className="px-4 py-4">{renderImagenAdjunta(evidencia, `Evidencia ${index + 1}`)}</td>
+                    <td className="px-4 py-4">{renderBotonImagenAdjunta(evidencia, `Evidencia ${index + 1}`)}</td>
                     <td className="px-4 py-4">{renderImagenAdjunta(firma, `Firma ${index + 1}`)}</td>
                     <td className="px-4 py-4">
                       <p className="font-bold text-slate-950">{texto(item.testigo?.hayTestigo)}</p>

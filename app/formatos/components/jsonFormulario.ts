@@ -120,13 +120,15 @@ export const limpiarFirmaParaJson = (dataUrl: string, prefijo: string) =>
 
 export const registrarJsonFinalFormulario = (registroFinal: unknown) => {
   if (process.env.NODE_ENV !== "production") {
-    console.groupCollapsed("JSON final del formulario");
-    console.log(registroFinal);
+    console.group("JSON final del formulario");
+    console.log({ respuestaJson: registroFinal });
     console.groupEnd();
   }
 };
 
 export const esperarVisualizacionJsonEnConsola = () => {
   if (process.env.NODE_ENV === "production") return Promise.resolve();
-  return new Promise((resolve) => window.setTimeout(resolve, 1200));
+  const continuar = window.confirm("JSON generado y guardado. Revisa la consola; cuando termines, acepta para ir al dashboard.");
+  if (!continuar) return new Promise(() => {});
+  return Promise.resolve();
 };

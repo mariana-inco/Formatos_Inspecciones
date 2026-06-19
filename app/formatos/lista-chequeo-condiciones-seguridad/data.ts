@@ -105,5 +105,3 @@ export const seccionesChequeo: SeccionChequeo[] = [
     ],
   },
 ];
-
-export const opcionesCantidadOtros = Array.from({ length: 5 }, (_, index) => String(index + 1));

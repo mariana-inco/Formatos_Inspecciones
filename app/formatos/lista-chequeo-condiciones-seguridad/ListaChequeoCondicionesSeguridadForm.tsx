@@ -4,17 +4,11 @@ import { useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3,
-  Check,
   ClipboardCheck,
   ClipboardList,
-  Eye,
   FilePlus2,
   FileText,
-  Grid2X2,
   HardHat,
-  Minus,
-  Search,
   Settings,
   UserCog,
   XCircle,
@@ -26,7 +20,7 @@ import {
   registrarJsonFinalFormulario,
 } from "../components/jsonFormulario";
 import { perfilRocaActual } from "../config/perfilRoca";
-import { FORM_META, opcionesCantidadOtros, opcionesEstado, seccionesChequeo } from "./data";
+import { FORM_META, opcionesEstado, seccionesChequeo } from "./data";
 import type { EstadoChequeo } from "./data";
 
 type DatosGenerales = {
@@ -38,7 +32,6 @@ type DatosGenerales = {
   numeroTrabajadoresArea: string;
   puestosTrabajo: string;
   sustanciasUtilizadas: string;
-  cantidadOtros: string;
   observacionesGenerales: string;
   recomendaciones: string;
 };
@@ -125,7 +118,6 @@ const datosGeneralesIniciales: DatosGenerales = {
   numeroTrabajadoresArea: "",
   puestosTrabajo: "",
   sustanciasUtilizadas: "",
-  cantidadOtros: "",
   observacionesGenerales: "",
   recomendaciones: "",
 };
@@ -134,8 +126,6 @@ const campoTexto =
   "mt-2 block h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const campoFecha =
   "date-input mt-2 block h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 shadow-sm outline-none transition [color-scheme:light] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
-const campoSeleccion =
-  "mt-2 block h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 shadow-sm outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100";
 const etiquetaCampo = "text-xs font-bold uppercase tracking-wide text-slate-600";
 const tarjetaSeccion = "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-200/70";
 const encabezadoSeccion = "flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-5 py-5";
@@ -179,11 +169,7 @@ const crearRespuestasIniciales = () => {
   });
   return respuestas;
 };
-const crearDetalleOtros = (cantidad: number, detalleActual: OtroDetalle[] = []) =>
-  Array.from(
-    { length: cantidad },
-    (_, index) => detalleActual[index] ?? { cual: "", estado: "", observaciones: "" }
-  );
+const crearOtroDetalle = (): OtroDetalle => ({ cual: "", estado: "", observaciones: "" });
 const etiquetaEstadoId = (estadoId?: number | null) => {
   if (estadoId === 1) return "Cumple";
   if (estadoId === 2) return "No cumple";
@@ -336,14 +322,15 @@ export default function ListaChequeoCondicionesSeguridadForm() {
     if (campo === "inspector") siguienteValor = quitarNumeros(value);
     if (campo === "numeroTrabajadoresArea") siguienteValor = soloNumeros(value);
 
-    if (campo === "cantidadOtros") {
-      const cantidad = Number(siguienteValor || 0);
-      setDatosGenerales((prev) => ({ ...prev, cantidadOtros: siguienteValor }));
-      setOtrosDetalle((prev) => crearDetalleOtros(cantidad, prev));
-      return;
-    }
-
     setDatosGenerales((prev) => ({ ...prev, [campo]: siguienteValor }));
+  };
+
+  const agregarOtroDetalle = () => {
+    setOtrosDetalle((prev) => [...prev, crearOtroDetalle()]);
+  };
+
+  const eliminarOtroDetalle = (index: number) => {
+    setOtrosDetalle((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const manejarEstadoItem = (key: string, estado: EstadoChequeo) => {
@@ -430,7 +417,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
       })),
     })),
     otros: {
-      cantidad: datosGenerales.cantidadOtros,
+      cantidad: String(otrosDetalle.length),
       detalle: otrosDetalle.map((otro, index) => ({
         numeroRegistro: index + 1,
         cual: otro.cual,
@@ -477,7 +464,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-3 py-6 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-slate-50 px-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] pt-6 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-[1500px]">
         <header className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm sm:p-5 lg:p-6">
           <div className="grid gap-5 lg:grid-cols-[1.35fr_0.9fr] lg:items-start">
@@ -639,47 +626,68 @@ export default function ListaChequeoCondicionesSeguridadForm() {
                 </div>
                 <h3 className="text-base font-bold uppercase tracking-wide text-slate-950">10. Otros</h3>
               </div>
-              <div className="m-5 max-w-xl rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <label className={etiquetaCampo}>¿Cuántos?</label>
-                <select name="cantidadOtros" value={datosGenerales.cantidadOtros} onChange={manejarCambioDatos} className={campoSeleccion}>
-                  <option value="">Seleccione una opcion</option>
-                  {opcionesCantidadOtros.map((opcion) => (
-                    <option key={opcion} value={opcion}>
-                      {opcion}
-                    </option>
-                  ))}
-                </select>
+              <div className="p-5">
+                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-wide text-slate-950">Otros ítems</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">Agregue solo las condiciones adicionales que apliquen.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={agregarOtroDetalle}
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-200 sm:w-auto"
+                  >
+                    <FilePlus2 className="size-5" aria-hidden="true" />
+                    Agregar otro
+                  </button>
+                </div>
               </div>
 
               {otrosDetalle.length > 0 ? (
                 <div className="grid gap-4 p-5 pt-0">
                   {otrosDetalle.map((otro, index) => (
-                    <div key={`otro-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="grid gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(260px,360px)] lg:items-end">
+                    <div key={`otro-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h4 className="text-sm font-bold uppercase tracking-wide text-slate-700">Otro {index + 1}</h4>
+                        <button
+                          type="button"
+                          onClick={() => eliminarOtroDetalle(index)}
+                          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold uppercase text-red-700 transition hover:border-red-300 hover:bg-red-100 sm:w-auto"
+                        >
+                          <XCircle className="size-4" aria-hidden="true" />
+                          Eliminar
+                        </button>
+                      </div>
+
+                      <div className="grid gap-4 lg:grid-cols-[minmax(220px,1fr)_minmax(260px,380px)] lg:items-end">
                         <div>
-                          <label className={etiquetaCampo}>{index + 1}. ¿Cual?</label>
+                          <label className={etiquetaCampo}>¿Cuál?</label>
                           <input
                             data-required-id={`otroCual-${index}`}
                             value={otro.cual}
                             onChange={(e) => manejarCambioOtro(index, "cual", e.target.value)}
+                            placeholder="Ej: Señalización adicional, herramienta, área"
                             className={campoTexto}
                           />
                         </div>
 
-                        <div data-required-id={`otroEstado-${index}`} className="flex w-full flex-wrap gap-2 rounded-xl bg-slate-50 p-2 text-sm font-semibold text-slate-700 lg:w-auto" tabIndex={-1}>
-                          {opcionesEstadoVisibles(otro.estado).map((opcion) => (
-                            <button
-                              key={`otro-${index}-${opcion}`}
-                              type="button"
-                              aria-pressed={otro.estado === opcion}
-                              onClick={() => manejarCambioOtro(index, "estado", opcion)}
-                              className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-sm transition sm:text-sm lg:flex-none ${
-                                claseBotonEstado(opcion, otro.estado === opcion)
-                              }`}
-                            >
-                              {opcion}
-                            </button>
-                          ))}
+                        <div>
+                          <p className={etiquetaCampo}>Condición</p>
+                          <div data-required-id={`otroEstado-${index}`} className="mt-2 flex w-full flex-wrap gap-2 rounded-xl bg-slate-50 p-2 text-sm font-semibold text-slate-700 lg:w-auto" tabIndex={-1}>
+                            {opcionesEstadoVisibles(otro.estado).map((opcion) => (
+                              <button
+                                key={`otro-${index}-${opcion}`}
+                                type="button"
+                                aria-pressed={otro.estado === opcion}
+                                onClick={() => manejarCambioOtro(index, "estado", opcion)}
+                                className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-sm transition sm:text-sm lg:flex-none ${
+                                  claseBotonEstado(opcion, otro.estado === opcion)
+                                }`}
+                              >
+                                {opcion}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
