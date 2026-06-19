@@ -468,7 +468,10 @@ const renderExtintores = (registro: any) => {
       <section className="space-y-5">
         {registros.map((item: any, index: number) => {
           const identificacion = item.identificacionExtintor || {};
-          const recarga = calcularEstadoRecarga(identificacion.fechaProximaRecarga);
+          const recarga = calcularEstadoRecarga({
+            fechaUltimaRecarga: identificacion.fechaUltimaRecarga,
+            fechaProximaRecarga: identificacion.fechaProximaRecarga,
+          });
           const revisiones = item.verificacion || [];
           const conteos = revisiones.reduce(
             (acc: Record<string, number>, revision: any) => {

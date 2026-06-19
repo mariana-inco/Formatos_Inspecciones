@@ -11,9 +11,15 @@ import {
   UserCog,
 } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
-import { calcularEstadoRecarga } from "../components/estadoRecarga";
+import { calcularEstadoRecarga, calcularFechaProximaRecargaAnual } from "../components/estadoRecarga";
 import type { SeveridadRecarga } from "../components/estadoRecarga";
-import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
+import {
+  esperarVisualizacionJsonEnConsola,
+  limpiarFirmaParaJson,
+  mapRevisionToId,
+  registrarJsonFinalFormulario,
+} from "../components/jsonFormulario";
+import { perfilRocaActual } from "../config/perfilRoca";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F003",
@@ -21,13 +27,6 @@ const METADATOS_FORMATO = {
   version: "05",
   area: "GESTIÓN HSE",
   titulo: "INSPECCIÓN Y VERIFICACIÓN DE EXTINTORES",
-};
-
-const perfilRocaActual = {
-  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
-  cargo: "DESARROLLADOR JUNIOR",
-  proceso: "GESTION DE TECNOLOGIA",
-  compania: "INCOMINERIA S.A.S.",
 };
 
 type EstadoRevision = "" | "BUENO" | "REGULAR" | "MALO" | "NO APLICA";
@@ -200,7 +199,10 @@ export default function InspeccionExtintoresForm() {
   const [modalFirmaAbierto, setModalFirmaAbierto] = useState(false);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
-  const estadoRecargaRegistro = calcularEstadoRecarga(registro.fechaProximaRecarga);
+  const estadoRecargaRegistro = calcularEstadoRecarga({
+    fechaUltimaRecarga: registro.fechaUltimaRecarga,
+    fechaProximaRecarga: registro.fechaProximaRecarga,
+  });
 
   const manejarCambioDatosInspeccion = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -213,7 +215,14 @@ export default function InspeccionExtintoresForm() {
     const { name, value } = e.target;
     const campo = name as keyof RegistroExtintor;
     const siguienteValor = campo === "numeroExtintor" ? soloNumeros(value) : value;
-    setRegistro((prev) => ({ ...prev, [campo]: siguienteValor }));
+    setRegistro((prev) => ({
+      ...prev,
+      [campo]: siguienteValor,
+      ...(campo === "fechaUltimaRecarga" &&
+      (!prev.fechaProximaRecarga || prev.fechaProximaRecarga === calcularFechaProximaRecargaAnual(prev.fechaUltimaRecarga))
+        ? { fechaProximaRecarga: calcularFechaProximaRecargaAnual(siguienteValor) }
+        : {}),
+    }));
   };
 
   const manejarEstadoRevision = (campo: keyof RegistroExtintor, estado: EstadoRevision) => {
@@ -262,8 +271,7 @@ export default function InspeccionExtintoresForm() {
     if (!registro.capacidad) camposFaltantes.push("capacidad");
     if (!registro.agente) camposFaltantes.push("agente");
     if (!registro.clase) camposFaltantes.push("clase");
-    if (!registro.fechaUltimaRecarga) camposFaltantes.push("fechaUltimaRecarga");
-    if (!registro.fechaProximaRecarga) camposFaltantes.push("fechaProximaRecarga");
+    if (!registro.fechaUltimaRecarga && !registro.fechaProximaRecarga) camposFaltantes.push("fechaUltimaRecarga");
     camposRevision.forEach((campo) => {
       if (!registro[campo.key]) camposFaltantes.push(String(campo.key));
     });
@@ -325,7 +333,7 @@ export default function InspeccionExtintoresForm() {
         clase: item.clase,
         ubicacion: item.ubicacion,
         fechaUltimaRecarga: item.fechaUltimaRecarga,
-        fechaProximaRecarga: item.fechaProximaRecarga,
+        fechaProximaRecarga: item.fechaProximaRecarga || calcularFechaProximaRecargaAnual(item.fechaUltimaRecarga),
       },
       verificacion: camposRevision.map((campo) => ({
         key: campo.key,
@@ -369,6 +377,7 @@ export default function InspeccionExtintoresForm() {
       referenciaFirma.current?.clear();
       setFirmaTieneTrazo(false);
       router.refresh();
+      await esperarVisualizacionJsonEnConsola();
       router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
@@ -627,7 +636,10 @@ export default function InspeccionExtintoresForm() {
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-yellow-900">Próxima recarga</p>
                         <p className="mt-1 text-sm font-bold text-slate-950">{mostrarValor(item.fechaProximaRecarga)}</p>
                         {(() => {
-                          const recarga = calcularEstadoRecarga(item.fechaProximaRecarga);
+                          const recarga = calcularEstadoRecarga({
+                            fechaUltimaRecarga: item.fechaUltimaRecarga,
+                            fechaProximaRecarga: item.fechaProximaRecarga,
+                          });
                           return (
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${claseRecarga(recarga.severidad)}`}>

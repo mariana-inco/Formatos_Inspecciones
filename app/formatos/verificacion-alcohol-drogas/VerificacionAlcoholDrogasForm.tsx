@@ -7,7 +7,13 @@ import Signature from "@uiw/react-signature";
 import type { SignatureRef } from "@uiw/react-signature";
 import { ClipboardList, Eye, HardHat, PenLine, ShieldCheck, Upload, UserCog, UsersRound } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
-import { limpiarFirmaParaJson, limpiarImagenParaJson, registrarJsonFinalFormulario } from "../components/jsonFormulario";
+import {
+  esperarVisualizacionJsonEnConsola,
+  limpiarFirmaParaJson,
+  limpiarImagenParaJson,
+  registrarJsonFinalFormulario,
+} from "../components/jsonFormulario";
+import { perfilRocaActual } from "../config/perfilRoca";
 
 const METADATOS_FORMATO = {
   codigo: "HSE-F020",
@@ -52,13 +58,6 @@ type DatosFormulario = {
 };
 
 type RegistroPersona = DatosFormulario;
-
-const perfilRocaActual = {
-  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
-  cargo: "DESARROLLADOR JUNIOR",
-  proceso: "GESTION DE TECNOLOGIA",
-  compania: "INCOMINERIA S.A.S.",
-};
 
 const datosIniciales: DatosFormulario = {
   email: "",
@@ -441,6 +440,7 @@ export default function VerificacionAlcoholDrogasForm() {
       await respuestaHttp.json();
       reiniciarFormularioCompleto();
       router.refresh();
+      await esperarVisualizacionJsonEnConsola();
       router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
@@ -745,7 +745,7 @@ export default function VerificacionAlcoholDrogasForm() {
 
                 <p className="pt-4 text-base text-slate-950 md:col-span-2">
                   <span className="font-bold text-red-600">NOTA:</span> Será positivo cuando el resultado del{" "}
-                  <span className="text-red-600">"Grado Detectado"</span> sea igual o mayor a{" "}
+                  <span className="text-red-600">&quot;Grado Detectado&quot;</span> sea igual o mayor a{" "}
                   <span className="text-red-600">20mg / 100ml</span>
                 </p>
                   </>

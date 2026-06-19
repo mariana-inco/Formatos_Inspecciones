@@ -29,7 +29,13 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
-import { limpiarFirmaParaJson, mapRevisionToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
+import {
+  esperarVisualizacionJsonEnConsola,
+  limpiarFirmaParaJson,
+  mapRevisionToId,
+  registrarJsonFinalFormulario,
+} from "../components/jsonFormulario";
+import { perfilRocaActual } from "../config/perfilRoca";
 import { FORM_META, camposEpp, gruposTablaEpp, opcionesCondicion } from "./data";
 import type { CampoEpp, CampoEppKey, CondicionEpp } from "./data";
 
@@ -53,13 +59,6 @@ type DatosFormulario = {
 } & Record<Exclude<CampoEppKey, "otrosEpps">, CondicionEpp>;
 
 type RegistroEpp = DatosFormulario;
-
-const perfilRocaActual = {
-  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
-  cargo: "DESARROLLADOR JUNIOR",
-  proceso: "GESTION DE TECNOLOGIA",
-  compania: "INCOMINERIA S.A.S.",
-};
 
 const datosIniciales: DatosFormulario = {
   email: "",
@@ -424,6 +423,7 @@ export default function InspeccionEppForm() {
 
       await response.json();
       router.refresh();
+      await esperarVisualizacionJsonEnConsola();
       router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
@@ -894,6 +894,4 @@ export default function InspeccionEppForm() {
     </div>
   );
 }
-
-
 

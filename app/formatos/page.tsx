@@ -4,7 +4,8 @@ import Link from "next/link";
 import { FileText, LayoutDashboard, Play, ShieldCheck } from "lucide-react";
 import DashboardFiltros from "./components/DashboardFiltros";
 import DistribucionFormatoDona from "./components/DistribucionFormatoDona";
-import { calcularEstadoRecarga } from "./components/estadoRecarga";
+import ExportarDashboardExcel from "./components/ExportarDashboardExcel";
+import { calcularEstadoRecarga, calcularFechaProximaRecargaAnual } from "./components/estadoRecarga";
 import type { EstadoRecarga } from "./components/estadoRecarga";
 import InspeccionesRecientes from "./components/InspeccionesRecientes";
 import { formatos } from "./data";
@@ -165,6 +166,11 @@ const detalleEstadoChequeo = (estadoId?: number | null): DetalleRegistroModulo["
 
 const detalleRegistroUrl = (codigo: string, archivo: string) => `/formatos/registros/${codigo}/${encodeURIComponent(archivo)}`;
 
+type ResultadoAlcoholDrogas = {
+  item: any;
+  positivo: boolean;
+};
+
 const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonModulo): RegistroModulo[] => {
   const base = datosBaseRegistro(codigo, ruta, registro);
 
@@ -240,35 +246,71 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
   }
 
   if (codigo === "HSE-F020") {
-    return (registro.registros || []).map((item: any) => {
+    const evaluados = registro.registros || [];
+    const resultados: ResultadoAlcoholDrogas[] = evaluados.map((item: any) => {
       const grado1 = Number(item.personaEvaluada?.gradoDetectadoMg100ml || 0);
       const grado2 = Number(item.personaEvaluada?.gradoDetectadoSegundaPruebaMg100ml || 0);
       const resultado1 = String(item.personaEvaluada?.resultadoPrimeraPruebaInicial || "").toUpperCase();
       const resultado2 = String(item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria || "").toUpperCase();
       const positivo = grado1 >= 20 || grado2 >= 20 || resultado1 === "POSITIVO" || resultado2 === "POSITIVO";
-      const sedeArea = sedeAreaValida(registro.datosGenerales?.centroTrabajoSede || registro.datosGenerales?.sede);
-      const responsable = registro.datosGenerales?.realizadoPor?.nombre || registro.datosGenerales?.evaluador || registro.registro?.usuarioEmail || "-";
-      const fecha = registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10) || "-";
-      return {
+
+      return { item, positivo };
+    });
+    const totalConNovedad = resultados.filter((resultado: ResultadoAlcoholDrogas) => resultado.positivo).length;
+    const totalConforme = resultados.length - totalConNovedad;
+    const estadoGeneral: RegistroModulo["estado"] =
+      resultados.length === 0 ? "Pendiente" : totalConNovedad > totalConforme ? "Con novedad" : "Conforme";
+    const sedeArea = sedeAreaValida(registro.datosGenerales?.centroTrabajoSede || registro.datosGenerales?.sede);
+    const responsable =
+      registro.datosGenerales?.realizadoPor?.nombre ||
+      registro.datosGenerales?.evaluador ||
+      registro.registro?.usuarioEmail ||
+      "-";
+    const fecha =
+      registro.datosGenerales?.fecha ||
+      registro.registro?.fechaRegistro?.slice(0, 10) ||
+      registro.fechaRegistro?.slice(0, 10) ||
+      "-";
+
+    return [
+      {
         ...base,
         fecha,
         responsable,
         sedeArea,
-        estado: positivo ? "Con novedad" : "Conforme",
-        novedades: positivo ? 1 : 0,
-        detalles: [
-          {
-            grupo: "Resultado de pruebas",
-            item: textoSeguro(item.personaEvaluada?.nombre, "Persona evaluada"),
-            estado: positivo ? "Con novedad" : "Conforme",
-            observaciones: positivo
-              ? `Primera prueba: ${item.personaEvaluada?.resultadoPrimeraPruebaInicial || grado1 || "Sin dato"}. Segunda prueba: ${item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria || grado2 || "Sin dato"}.`
-              : "Resultados registrados como conformes.",
-          },
-        ],
-        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, item.personaEvaluada?.nombre, registro.datosGenerales?.criteriosTomaMuestra || registro.datosGenerales?.criterioTomaMuestra]),
-      };
-    });
+        estado: estadoGeneral,
+        novedades: totalConNovedad,
+        detalles: resultados.map(({ item, positivo }) => ({
+          grupo: "Resultado de pruebas",
+          item: textoSeguro(item.personaEvaluada?.nombre, "Persona evaluada"),
+          estado: positivo ? "Con novedad" : "Conforme",
+          observaciones: positivo
+            ? `Primera prueba: ${
+                item.personaEvaluada?.resultadoPrimeraPruebaInicial ||
+                item.personaEvaluada?.gradoDetectadoMg100ml ||
+                "Sin dato"
+              }. Segunda prueba: ${
+                item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria ||
+                item.personaEvaluada?.gradoDetectadoSegundaPruebaMg100ml ||
+                "Sin dato"
+              }.`
+            : "Resultados registrados como conformes.",
+        })),
+        busqueda: unirBusqueda([
+          codigo,
+          nombreFormato(codigo),
+          sedeArea,
+          responsable,
+          registro.datosGenerales?.criteriosTomaMuestra || registro.datosGenerales?.criterioTomaMuestra,
+          ...resultados.flatMap(({ item }) => [
+            item.personaEvaluada?.nombre,
+            item.personaEvaluada?.identificacion,
+            item.personaEvaluada?.resultadoPrimeraPruebaInicial,
+            item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria,
+          ]),
+        ]),
+      },
+    ];
   }
 
   if (codigo === "HSE-F003") {
@@ -276,9 +318,12 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
       const verificacion = item.verificacion || [];
       const malos = verificacion.filter((revision: any) => estadoRevisionId(revision) === 3).length;
       const regulares = verificacion.filter((revision: any) => estadoRevisionId(revision) === 2).length;
-      const fechaProximaRecarga = item.identificacionExtintor?.fechaProximaRecarga || "";
-      const recarga = calcularEstadoRecarga(fechaProximaRecarga);
-      const vencimiento = recarga.estado === "Vencido" ? "Vencido" : recarga.estado === "Regular" || recarga.estado === "Vence hoy" ? "Próximo" : "Vigente";
+      const fechaUltimaRecarga = item.identificacionExtintor?.fechaUltimaRecarga || "";
+      const fechaProximaRecarga =
+        item.identificacionExtintor?.fechaProximaRecarga || calcularFechaProximaRecargaAnual(fechaUltimaRecarga);
+      const recarga = calcularEstadoRecarga({ fechaUltimaRecarga, fechaProximaRecarga });
+      const vencimiento =
+        recarga.estado === "Vencido" ? "Vencido" : recarga.estado === "Próximo a vencer" || recarga.estado === "Vence hoy" ? "Próximo" : "Vigente";
       const novedades = malos + (recarga.severidad === "malo" || recarga.severidad === "critico" ? 1 : 0);
       const sedeArea = sedeAreaValida(registro.datosInspeccion?.sedeCentroTrabajo || item.identificacionExtintor?.ubicacion);
       const responsable = registro.datosInspeccion?.responsableInspeccion || registro.registro?.usuarioEmail || "-";
@@ -572,9 +617,12 @@ export default async function FormatosPage({
       <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-8 lg:px-10">
         {vistaActiva === "dashboard" ? (
           <>
-          <section>
-            <p className="text-sm font-medium text-slate-500">Módulo de Inspecciones</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Dashboard Inspecciones HSE</h1>
+          <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Módulo de Inspecciones</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Dashboard Inspecciones HSE</h1>
+            </div>
+            <ExportarDashboardExcel registros={inspeccionesMetricas} />
           </section>
 
           <DashboardFiltros

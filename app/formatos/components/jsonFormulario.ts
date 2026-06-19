@@ -125,3 +125,8 @@ export const registrarJsonFinalFormulario = (registroFinal: unknown) => {
     console.groupEnd();
   }
 };
+
+export const esperarVisualizacionJsonEnConsola = () => {
+  if (process.env.NODE_ENV === "production") return Promise.resolve();
+  return new Promise((resolve) => window.setTimeout(resolve, 1200));
+};

@@ -28,22 +28,22 @@ const claseRecarga = (severidad: SeveridadRecarga) => {
 const detalleCortoRecarga = (registro: RegistroModulo) => {
   const recarga = registro.recarga;
   if (!recarga) return "";
-  if (recarga.estado === "Regular" && recarga.dias !== null) return `Faltan ${recarga.dias} días`;
-  if (recarga.estado === "Vencido" && recarga.dias !== null) return `Hace ${Math.abs(recarga.dias)} días`;
+  if (recarga.estado === "Próximo a vencer" && recarga.dias !== null) return `Faltan ${recarga.dias} días`;
+  if (recarga.estado === "Vencido") return "Gestión urgente";
   if (recarga.estado === "Vence hoy") return "Requiere gestión";
   if (recarga.estado === "Pendiente") return "Sin fecha registrada";
-  if (recarga.estado === "Bueno" && recarga.dias !== null) return `Faltan ${recarga.dias} días`;
+  if (recarga.estado === "Vigente" && recarga.dias !== null) return `Faltan ${recarga.dias} días`;
   return recarga.mensaje;
 };
 
 const detalleConsultivoRecarga = (registro: RegistroModulo) => {
   const recarga = registro.recarga;
   if (!recarga) return null;
-  if (recarga.estado === "Regular" && recarga.dias !== null) {
-    return `Este extintor está próximo a vencer. Faltan ${recarga.dias} días para la próxima recarga.`;
+  if (recarga.estado === "Próximo a vencer" && recarga.dias !== null) {
+    return `Este extintor está próximo a vencer. Faltan ${recarga.dias} días para la próxima recarga anual.`;
   }
   if (recarga.estado === "Vencido" && recarga.dias !== null) {
-    return `Este extintor está vencido. Han pasado ${Math.abs(recarga.dias)} días desde la fecha de próxima recarga.`;
+    return `Este extintor está vencido. Han pasado ${Math.abs(recarga.dias)} días desde la fecha de próxima recarga anual. Gestión urgente.`;
   }
   if (recarga.estado === "Vence hoy") return "Este extintor vence hoy. Requiere gestión.";
   return recarga.mensaje;

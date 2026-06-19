@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
 import {
+  esperarVisualizacionJsonEnConsola,
   limpiarFirmaParaJson,
   limpiarImagenParaJson,
   mapConceptoToId,
   registrarJsonFinalFormulario,
 } from "../components/jsonFormulario";
+import { perfilRocaActual } from "../config/perfilRoca";
 import {
   inspectionTypeKeys as clavesTiposInspeccion,
   inspectionTypes as tiposInspeccion,
@@ -51,13 +53,6 @@ const METADATOS_FORMATO = {
   codigo: "HSE-F006",
   fecha: "2025-09-18",
   version: "04",
-};
-
-const perfilRocaActual = {
-  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
-  cargo: "DESARROLLADOR JUNIOR",
-  proceso: "GESTION DE TECNOLOGIA",
-  compania: "INCOMINERIA S.A.S.",
 };
 
 const claseCampoFecha =
@@ -578,6 +573,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
       await respuestaHttp.json();
       limpiarFormularioParaNuevoRegistro();
       router.refresh();
+      await esperarVisualizacionJsonEnConsola();
       router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
@@ -1044,7 +1040,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
             <div className="mt-5 space-y-6 text-center italic">
               <p className="text-sm font-bold text-slate-950">
-                En las casilla de CONCEPTO, escriba "ACEPTADO" o "RECHAZADO" y en la casilla COMENTARIOS haga las anotaciones específicas necesarias.
+                En las casilla de CONCEPTO, escriba &quot;ACEPTADO&quot; o &quot;RECHAZADO&quot; y en la casilla COMENTARIOS haga las anotaciones específicas necesarias.
               </p>
               <p className="text-xs font-bold text-red-600">
                 IMPORTANTE: Antes de agregar datos, verifique cuidadosamente la información, ya que una vez ingresada no podrá ser modificada.
@@ -1102,7 +1098,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
             <div className="mt-5 space-y-6 text-center italic">
               <p className="text-sm font-bold text-slate-950">
-                En las casilla de CONCEPTO, escriba "ACEPTADO" o "RECHAZADO" y en la casilla COMENTARIOS haga las anotaciones específicas necesarias.
+                En las casilla de CONCEPTO, escriba &quot;ACEPTADO&quot; o &quot;RECHAZADO&quot; y en la casilla COMENTARIOS haga las anotaciones específicas necesarias.
               </p>
               <p className="text-xs font-bold text-red-600">
                 IMPORTANTE: Antes de agregar datos, verifique cuidadosamente la información, ya que una vez ingresada no podrá ser modificada.

@@ -20,7 +20,12 @@ import {
   XCircle,
 } from "lucide-react";
 import { enfocarYMostrarCampoFaltante } from "../components/campoFaltante";
-import { mapEstadoToId, registrarJsonFinalFormulario } from "../components/jsonFormulario";
+import {
+  esperarVisualizacionJsonEnConsola,
+  mapEstadoToId,
+  registrarJsonFinalFormulario,
+} from "../components/jsonFormulario";
+import { perfilRocaActual } from "../config/perfilRoca";
 import { FORM_META, opcionesCantidadOtros, opcionesEstado, seccionesChequeo } from "./data";
 import type { EstadoChequeo } from "./data";
 
@@ -109,13 +114,6 @@ type FilaRegistrosCondiciones = {
   estado: "Cumple" | "Con hallazgos" | "Sin evaluar";
   archivo: string;
   registro: RegistroCondicionesGuardado;
-};
-
-const perfilRocaActual = {
-  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
-  cargo: "DESARROLLADOR JUNIOR",
-  proceso: "GESTION DE TECNOLOGIA",
-  compania: "INCOMINERIA S.A.S.",
 };
 
 const datosGeneralesIniciales: DatosGenerales = {
@@ -470,6 +468,7 @@ export default function ListaChequeoCondicionesSeguridadForm() {
       setRespuestas(crearRespuestasIniciales());
       setOtrosDetalle([]);
       router.refresh();
+      await esperarVisualizacionJsonEnConsola();
       router.push("/formatos");
     } catch (error) {
       console.error("Error guardando la respuesta en JSON:", error);
