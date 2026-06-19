@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import Link from "next/link";
-import { FileText, LayoutDashboard, Play, ShieldCheck } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, FileText, LayoutDashboard, MapPin, Play, ShieldCheck, TriangleAlert } from "lucide-react";
 import DashboardFiltros from "./components/DashboardFiltros";
 import DistribucionFormatoDona from "./components/DistribucionFormatoDona";
 import ExportarDashboardExcel from "./components/ExportarDashboardExcel";
@@ -546,11 +546,13 @@ export default async function FormatosPage({
     return { mes: mes.label, realizadas: registrosMes.length, novedades: registrosMes.reduce((acc, registro) => acc + registro.novedades, 0) };
   });
   const maxTendencia = Math.max(...tendencia.flatMap((item) => [item.realizadas, item.novedades]), 1);
+  const alturaMaximaBarra = 84;
+  const alturaBarraSinDatos = 13;
   const tendenciaVisual = tendencia.map((item) => ({
     ...item,
     sinRegistros: item.realizadas === 0 && item.novedades === 0,
-    alturaRealizadas: Math.max(18, Math.round((item.realizadas / maxTendencia) * 100)),
-    alturaNovedades: Math.max(18, Math.round((item.novedades / maxTendencia) * 100)),
+    alturaRealizadas: item.realizadas > 0 ? Math.max(16, Math.round((item.realizadas / maxTendencia) * alturaMaximaBarra)) : alturaBarraSinDatos,
+    alturaNovedades: item.novedades > 0 ? Math.max(16, Math.round((item.novedades / maxTendencia) * alturaMaximaBarra)) : alturaBarraSinDatos,
   }));
   const distribucionFormato = fuentes.map((fuente, index) => {
     const nombreCorto = nombreFormato(fuente.codigo)
@@ -638,31 +640,62 @@ export default async function FormatosPage({
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
-              { title: "Total inspecciones", value: totalInspecciones, meta: "Módulo HSE", tone: "text-slate-700", bg: "bg-slate-100" },
-              { title: "Inspecciones del mes", value: sinResultadosPorFiltro ? "Sin datos" : inspeccionesMes, meta: "Mes actual", tone: "text-slate-700", bg: "bg-slate-100" },
-              { title: "Inspecciones conformes", value: sinResultadosPorFiltro ? "Sin datos" : conformes, meta: "Normalizadas", tone: "text-[#006948]", bg: "bg-[#E8F5E9]" },
               {
-                title: "Inspecciones con novedades",
+                title: "Total inspecciones",
+                value: totalInspecciones,
+                meta: "",
+                icon: ClipboardCheck,
+                iconBox: "bg-emerald-200 text-emerald-900",
+                accent: "",
+                valueClass: "text-[#006948]",
+              },
+              {
+                title: "Inspecciones del mes",
+                value: sinResultadosPorFiltro ? "Sin datos" : inspeccionesMes,
+                meta: "Mes actual",
+                icon: CalendarDays,
+                iconBox: "bg-blue-100 text-slate-900",
+                accent: "",
+                valueClass: "text-[#006948]",
+              },
+              {
+                title: "Inspecciones conformes",
+                value: sinResultadosPorFiltro ? "Sin datos" : conformes,
+                meta: "",
+                icon: CheckCircle2,
+                iconBox: "bg-emerald-200 text-[#006948]",
+                accent: "border-l-4 border-l-[#006948]",
+                valueClass: "text-[#006948]",
+              },
+              {
+                title: "Con novedades",
                 value: sinResultadosPorFiltro ? "Sin datos" : inspeccionesConNovedad,
-                meta: sinResultadosPorFiltro ? "Hallazgos" : `${novedadesDetectadas} ${novedadesDetectadas === 1 ? "hallazgo" : "hallazgos"}`,
-                tone: "text-red-700",
-                bg: "bg-[#FFEBEE]",
+                meta: sinResultadosPorFiltro ? "" : `${novedadesDetectadas} ${novedadesDetectadas === 1 ? "hallazgo" : "hallazgos"}`,
+                icon: TriangleAlert,
+                iconBox: "bg-red-100 text-red-900",
+                accent: "border-l-4 border-l-red-900",
+                valueClass: "text-red-900",
               },
             ].map((item) => (
-              <article key={item.title} className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{item.title}</p>
-                    <p className="mt-3 text-3xl font-bold text-slate-950">{item.value}</p>
+              <article key={item.title} className={`min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm ${item.accent}`}>
+                <div className="flex items-center gap-4">
+                  <div className={`grid size-12 shrink-0 place-items-center rounded-lg ${item.iconBox}`}>
+                    <item.icon className="size-5" aria-hidden="true" />
                   </div>
-                  <span className={`inline-flex min-w-0 shrink-0 items-center justify-center rounded-full px-4 py-2 text-center text-xs font-bold whitespace-nowrap ${item.bg} ${item.tone}`}>{item.meta}</span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-600">{item.title}</p>
+                    <div className="mt-1 flex flex-wrap items-end gap-2">
+                      <p className={`text-3xl font-bold leading-none ${item.valueClass}`}>{item.value}</p>
+                      {item.meta ? <span className="pb-1 text-[10px] font-bold text-[#006948]">{item.meta}</span> : null}
+                    </div>
+                  </div>
                 </div>
               </article>
             ))}
           </section>
 
-          <section className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <section className="grid min-w-0 items-stretch gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <article className="flex h-full min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-slate-950">Inspecciones por mes</h2>
@@ -675,13 +708,13 @@ export default async function FormatosPage({
                 </div>
               </div>
               {inspeccionesMetricas.length > 0 ? (
-                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-100 bg-slate-50/60 px-4 pb-4 pt-5 sm:px-5">
-                  <div className="flex h-64 min-w-[520px] items-end justify-between gap-4 border-b border-slate-200">
+                <div className="mt-4 flex-1 overflow-x-auto rounded-lg border border-slate-100 bg-slate-50/60 px-4 pb-4 pt-5 sm:px-5">
+                  <div className="flex h-full min-h-72 min-w-[520px] items-end justify-between gap-4 border-b border-slate-200">
                     {tendenciaVisual.map((item) => (
                       <div key={item.mes} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                         <div className="flex flex-1 items-end justify-center gap-2">
                           {item.sinRegistros ? (
-                            <div className="mb-0 flex h-[18%] w-full max-w-20 items-end justify-center rounded-t-lg bg-slate-200/80">
+                            <div className="mb-0 flex w-full max-w-20 items-end justify-center rounded-t-lg bg-slate-200/80" style={{ height: `${alturaBarraSinDatos}%` }}>
                               <span className="mb-2 text-[10px] font-bold text-slate-400">0</span>
                             </div>
                           ) : (
@@ -703,18 +736,18 @@ export default async function FormatosPage({
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 grid h-64 place-items-center rounded-lg border border-slate-100 bg-slate-50 text-sm font-medium text-slate-500">
+                <div className="mt-4 grid min-h-64 flex-1 place-items-center rounded-lg border border-slate-100 bg-slate-50 text-sm font-medium text-slate-500">
                   Sin datos para el periodo seleccionado
                 </div>
               )}
             </article>
 
-            <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <article className="flex h-full min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-950">Distribución por formato</h2>
                 <p className="mt-1 text-sm font-medium text-slate-500">Participación de inspecciones creadas según filtros activos.</p>
               </div>
-              <div className="mt-5">
+              <div className="mt-5 flex-1">
                 {totalDistribucion > 0 ? (
                   <DistribucionFormatoDona segmentos={segmentosDistribucion} total={totalDistribucion} />
                 ) : (
@@ -726,37 +759,78 @@ export default async function FormatosPage({
 
           <section className="grid min-w-0 gap-6 xl:grid-cols-3">
             {[
-              ["Inspecciones por formato", porFormato, maxFormato, porFormatoCompleto],
-              ["Hallazgos por formato", novedadesPorFormato, maxNovedades, novedadesPorFormatoCompleto],
-              ["Inspecciones por sede o área", porSedeArea, maxSedeArea, porSedeAreaCompleto],
-            ].map(([title, items, max, allItems]) => {
-              const visibles = items as Array<{ label: string; value: number }>;
-              const completos = allItems as Array<{ label: string; value: number }>;
+              {
+                title: "Inspecciones por formato",
+                items: porFormato,
+                max: maxFormato,
+                allItems: porFormatoCompleto,
+                icon: ClipboardCheck,
+                iconBox: "bg-emerald-100 text-[#006948]",
+                pill: "bg-emerald-50 text-[#006948]",
+                bar: "bg-[#20A37A]",
+                totalLabel: `${porFormatoCompleto.reduce((acc, item) => acc + item.value, 0)} total`,
+              },
+              {
+                title: "Hallazgos por formato",
+                items: novedadesPorFormato,
+                max: maxNovedades,
+                allItems: novedadesPorFormatoCompleto,
+                icon: TriangleAlert,
+                iconBox: "bg-red-50 text-red-800",
+                pill: "bg-red-50 text-red-800",
+                bar: "bg-orange-600",
+                totalLabel: `${novedadesPorFormatoCompleto.reduce((acc, item) => acc + item.value, 0)} total`,
+              },
+              {
+                title: "Inspecciones por sede o área",
+                items: porSedeArea,
+                max: maxSedeArea,
+                allItems: porSedeAreaCompleto,
+                icon: MapPin,
+                iconBox: "bg-blue-50 text-blue-700",
+                pill: "bg-blue-50 text-blue-700",
+                bar: "bg-blue-500",
+                totalLabel: `${porSedeAreaCompleto.length} ${porSedeAreaCompleto.length === 1 ? "sede" : "sedes"}`,
+              },
+            ].map((config) => {
+              const visibles = config.items;
+              const completos = config.allItems;
+              const Icon = config.icon;
               return (
-                <article key={String(title)} className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                  <h2 className="text-base font-bold text-slate-950">{String(title)}</h2>
+                <article key={config.title} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${config.iconBox}`}>
+                      <Icon className="size-4" aria-hidden="true" />
+                    </div>
+                    <h2 className="min-w-0 text-base font-bold uppercase leading-tight tracking-wide text-slate-700">{config.title}</h2>
+                  </div>
+
+                  <span className={`mt-4 inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${config.pill}`}>
+                    {config.totalLabel}
+                  </span>
+
                   <div className="mt-4 space-y-3">
                     {visibles.map((item) => (
-                      <div key={`${String(title)}-${item.label}`}>
-                        <div className="mb-1 flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
-                          <span className="truncate">{item.label}</span>
-                          <span>{item.value}</span>
+                      <div key={`${config.title}-${item.label}`} className="grid grid-cols-[minmax(0,1fr)_112px_20px] items-center gap-3">
+                        <span className="min-w-0 truncate text-sm font-bold text-slate-800" title={item.label}>{item.label}</span>
+                        <div className="h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">
+                          <div className={`h-full rounded-full ${config.bar}`} style={{ width: `${Math.max(8, Math.round((item.value / Number(config.max)) * 100))}%` }} />
                         </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-[#006948]" style={{ width: `${Math.max(8, Math.round((item.value / Number(max)) * 100))}%` }} />
-                        </div>
+                        <span className={`text-right text-sm font-bold ${config.bar === "bg-blue-500" ? "text-blue-600" : config.bar === "bg-orange-600" ? "text-orange-700" : "text-[#006948]"}`}>
+                          {item.value}
+                        </span>
                       </div>
                     ))}
                     {visibles.length === 0 ? (
-                      <p className="rounded-lg bg-slate-50 px-4 py-6 text-sm font-medium text-slate-500">Sin inspecciones</p>
+                      <p className="rounded-lg bg-slate-50 px-4 py-4 text-sm font-medium text-slate-500">Sin inspecciones</p>
                     ) : null}
                   </div>
                   {completos.length > visibles.length ? (
-                    <details className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
-                      <summary className="cursor-pointer font-bold text-[#006948]">Ver más</summary>
+                    <details className="mt-4 rounded-lg bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
+                      <summary className="cursor-pointer font-bold text-slate-700">Ver más</summary>
                       <div className="mt-3 space-y-2">
                         {completos.slice(visibles.length).map((item) => (
-                          <div key={`extra-${String(title)}-${item.label}`} className="flex items-center justify-between gap-3">
+                          <div key={`extra-${config.title}-${item.label}`} className="flex items-center justify-between gap-3">
                             <span className="truncate">{item.label}</span>
                             <span>{item.value}</span>
                           </div>
