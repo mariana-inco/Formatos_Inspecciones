@@ -1,6 +1,6 @@
 export const perfilRocaActual = {
-  nombre: "KATHERIN MARIANA GOMEZ CEPEDA",
-  cargo: "DESARROLLADORA JUNIOR",
-  proceso: "GESTION DE TECNOLOGIA",
+  nombre: "Katherin Mariana Gomez Cepeda",
+  cargo: "Desarrolladora Junior",
+  proceso: "HSE",
   compania: "INCOMINERIA S.A.S.",
 } as const;
