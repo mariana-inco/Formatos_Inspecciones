@@ -24,7 +24,7 @@ type ArchivoFormulario = {
   dataUrl?: string;
 };
 
-type OpcionesArchivo = {
+type OpcionesArchivo = { 
   nombreArchivo?: string;
   dataUrl?: string;
   carpeta: "firmas" | "evidencias";

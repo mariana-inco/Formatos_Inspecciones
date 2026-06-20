@@ -2,13 +2,30 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Eye, HardHat, X } from "lucide-react";
+import {
+  ClipboardCheck,
+  ClipboardList,
+  Eye,
+  FireExtinguisher,
+  FlaskConical,
+  HardHat,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import type { DetalleRegistroModulo, RegistroModulo } from "../page";
 import type { SeveridadRecarga } from "./estadoRecarga";
 
 type Props = {
   registros: RegistroModulo[];
 };
+
+const iconosFormato = {
+  "HSE-F006": ShieldCheck,
+  "HSE-F002": HardHat,
+  "HSE-F020": FlaskConical,
+  "HSE-F003": FireExtinguisher,
+  "HSE-F010": ClipboardList,
+} as const;
 
 const claseEstado = (estado: string) => {
   if (estado === "Conforme") return "bg-[#E8F5E9] text-[#006948]";
@@ -131,12 +148,11 @@ export default function InspeccionesRecientes({ registros }: Props) {
         <h2 className="text-lg font-bold text-slate-950">Inspecciones recientes</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-[1320px] w-full text-sm">
+        <table className="min-w-[1180px] w-full text-sm">
           <thead className="bg-white text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="w-32 px-5 py-4">Código</th>
-              <th className="w-36 px-5 py-4">Fecha</th>
               <th className="min-w-80 px-5 py-4">Formato</th>
+              <th className="w-36 px-5 py-4">Fecha</th>
               <th className="min-w-64 px-5 py-4">Sede / Área</th>
               <th className="min-w-80 px-5 py-4">Responsable / Inspector</th>
               <th className="min-w-36 px-5 py-4">Estado general</th>
@@ -144,26 +160,28 @@ export default function InspeccionesRecientes({ registros }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {registros.map((registro, index) => (
+            {registros.map((registro, index) => {
+              const IconoFormato = iconosFormato[registro.codigo as keyof typeof iconosFormato] || ClipboardCheck;
+
+              return (
               <tr key={`${registro.codigo}-${registro.fecha}-${index}`} className="hover:bg-slate-50/70">
-                <td className="whitespace-nowrap px-5 py-4 font-bold text-slate-950">{registro.codigo}</td>
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-9 place-items-center rounded-lg bg-[#E8F5E9] text-[#006948]">
+                      <IconoFormato className="size-4" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-950">{registro.codigo}</p>
+                      <p className="text-xs font-medium text-slate-500">{registro.formato}</p>
+                    </div>
+                  </div>
+                </td>
                 <td className="px-5 py-4">
                   <div className="inline-flex flex-col whitespace-nowrap">
                     <span className="font-medium text-slate-700">{registro.fecha}</span>
                     {formatearHoraRegistro(registro.fechaCreacionMs) ? (
                       <span className="mt-1 text-xs font-bold text-slate-500">{formatearHoraRegistro(registro.fechaCreacionMs)}</span>
                     ) : null}
-                  </div>
-                </td>
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-9 place-items-center rounded-lg bg-[#E8F5E9] text-[#006948]">
-                      <HardHat className="size-4" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-950">{registro.codigo}</p>
-                      <p className="text-xs font-medium text-slate-500">{registro.formato}</p>
-                    </div>
                   </div>
                 </td>
                 <td className="px-5 py-4 font-medium text-slate-600">
@@ -202,10 +220,11 @@ export default function InspeccionesRecientes({ registros }: Props) {
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {registros.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-sm font-medium text-slate-500">
+                <td colSpan={6} className="px-5 py-10 text-center text-sm font-medium text-slate-500">
                   Sin registros guardados
                 </td>
               </tr>
