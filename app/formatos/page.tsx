@@ -75,15 +75,16 @@ const iconosFormato = {
 const nombreFormato = (codigo: string) => formatos.find((formato) => formato.codigo === codigo)?.nombre || codigo;
 
 const contar = (items: string[]) =>
-  Object.entries(
-    items.reduce<Record<string, number>>((acc, item) => {
-      const label = item || "Sin sede/área registrada";
-      acc[label] = (acc[label] || 0) + 1;
+  Object.values(
+    items.reduce<Record<string, { label: string; value: number }>>((acc, item) => {
+      const texto = item?.trim().replace(/\s+/g, " ") || "Sin sede/área registrada";
+      const key = texto.toLocaleLowerCase("es-CO");
+      const label = texto.charAt(0).toLocaleUpperCase("es-CO") + texto.slice(1);
+      acc[key] = acc[key] ? { ...acc[key], value: acc[key].value + 1 } : { label, value: 1 };
       return acc;
     }, {})
   )
-    .sort(([, a], [, b]) => b - a)
-    .map(([label, value]) => ({ label, value }));
+    .sort((a, b) => b.value - a.value);
 
 const sumarPor = (items: RegistroModulo[], obtenerLabel: (item: RegistroModulo) => string, obtenerValor: (item: RegistroModulo) => number) =>
   Object.entries(
@@ -139,14 +140,13 @@ const textoSeguro = (value: unknown, fallback: string) => {
 };
 
 const extraerFechaArchivo = (archivo?: string) => {
-  const match = archivo?.match(/(\d{4}-\d{2}-\d{2}T[\d-]+)/);
+  const match = archivo?.match(/(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);
   if (!match) return "";
-  const [fecha, hora = ""] = match[1].split("T");
-  return `${fecha}T${hora.replace(/-/g, ":")}`;
+  return `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z`;
 };
 
 const obtenerFechaCreacion = (registro: RespuestaJsonModulo) =>
-  registro.registro?.fechaRegistro || registro.fechaRegistro || extraerFechaArchivo(registro.__archivo);
+  extraerFechaArchivo(registro.__archivo) || registro.registro?.fechaRegistro || registro.fechaRegistro || "";
 
 const obtenerFechaCreacionMs = (registro: RespuestaJsonModulo) => {
   const tiempo = Date.parse(obtenerFechaCreacion(registro));
@@ -164,7 +164,8 @@ const datosBaseRegistro = (codigo: string, ruta: string, registro: RespuestaJson
 
 const detalleEstadoCondicion = (estadoId?: number | null): DetalleRegistroModulo["estado"] => {
   if (estadoId === 1) return "Conforme";
-  if (estadoId === 2 || estadoId === 3) return "Con novedad";
+  if (estadoId === 2) return "Regular";
+  if (estadoId === 3) return "Con novedad";
   if (estadoId === 4) return "No aplica";
   return "Pendiente";
 };
@@ -214,7 +215,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
         observaciones: registro.cierreInspeccion?.comentariosFinales,
       },
     ];
-    const sedeArea = sedeAreaValida(registro.inspeccion?.nombre);
+    const sedeArea = sedeAreaValida(registro.datosEquipo?.sedeArea || registro.formato?.area);
     const responsable = registro.registro?.usuarioEmail || "-";
     const fecha = registro.datosEquipo?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
     const detalles = detallesChecklist.length > 0 ? detallesChecklist : detallesFallback;
@@ -242,27 +243,39 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
   }
 
   if (codigo === "HSE-F002") {
-    return (registro.registros || []).map((item: any) => {
-      const condiciones = [...(item.condicionesEpp || []), ...(item.otrosEpps?.detalle || [])];
+    return (registro.registros || []).map((item: any, registroIndex: number) => {
+      const condicionesBase = (item.condicionesEpp || []).filter((condicion: any) => condicion.key !== "otrosEpps");
+      const condiciones = [...condicionesBase, ...(item.otrosEpps?.detalle || [])];
       const malos = condiciones.filter((condicion: any) => condicion.condicionId === 3).length;
       const regulares = condiciones.filter((condicion: any) => condicion.condicionId === 2).length;
+      const pendientes = condiciones.filter((condicion: any) => ![1, 2, 3, 4].includes(condicion.condicionId)).length;
       const sedeArea = sedeAreaValida(registro.datosGenerales?.areaTrabajo || registro.datosGenerales?.lugar);
-      const responsable = item.trabajador?.nombre || registro.registro?.usuarioEmail || "-";
+      const colaborador = item.colaborador?.nombre || item.trabajador?.nombre || `Registro ${registroIndex + 1}`;
+      const responsable = registro.registro?.usuarioEmail || colaborador;
       const fecha = registro.datosGenerales?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
       return {
         ...base,
         fecha,
         responsable,
         sedeArea,
-        estado: malos > 0 ? "Con novedad" : regulares > 0 ? "Regular" : "Conforme",
+        estado: malos > 0 ? "Con novedad" : regulares > 0 ? "Regular" : pendientes > 0 ? "Pendiente" : "Conforme",
         novedades: malos,
         detalles: condiciones.map((condicion: any, condicionIndex: number) => ({
-          grupo: textoSeguro(condicion.categoria || condicion.tipoEpp || condicion.elemento, "Elementos EPP"),
+          grupo: textoSeguro(colaborador, `Registro ${registroIndex + 1}`),
           item: textoSeguro(condicion.nombre || condicion.epp || condicion.descripcion || condicion.cual, `Elemento ${condicionIndex + 1}`),
           estado: detalleEstadoCondicion(condicion.condicionId),
           observaciones: condicion.observaciones,
         })),
-        busqueda: unirBusqueda([codigo, nombreFormato(codigo), sedeArea, responsable, item.trabajador?.cargo, registro.datosGenerales?.lugar]),
+        busqueda: unirBusqueda([
+          codigo,
+          nombreFormato(codigo),
+          sedeArea,
+          responsable,
+          colaborador,
+          item.colaborador?.cargo,
+          item.trabajador?.cargo,
+          registro.datosGenerales?.lugar,
+        ]),
       };
     });
   }
@@ -281,7 +294,13 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
     const totalConNovedad = resultados.filter((resultado: ResultadoAlcoholDrogas) => resultado.positivo).length;
     const totalConforme = resultados.length - totalConNovedad;
     const estadoGeneral: RegistroModulo["estado"] =
-      resultados.length === 0 ? "Pendiente" : totalConNovedad > totalConforme ? "Con novedad" : "Conforme";
+      resultados.length === 0
+        ? "Pendiente"
+        : totalConNovedad > totalConforme
+          ? "Con novedad"
+          : totalConNovedad === totalConforme
+            ? "Regular"
+            : "Conforme";
     const sedeArea = sedeAreaValida(registro.datosGenerales?.centroTrabajoSede || registro.datosGenerales?.sede);
     const responsable =
       registro.datosGenerales?.realizadoPor?.nombre ||
@@ -302,22 +321,27 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
         sedeArea,
         estado: estadoGeneral,
         novedades: totalConNovedad,
-        detalles: resultados.map(({ item, positivo }) => ({
-          grupo: "Resultado de pruebas",
-          item: textoSeguro(item.personaEvaluada?.nombre, "Persona evaluada"),
-          estado: positivo ? "Con novedad" : "Conforme",
-          observaciones: positivo
-            ? `Primera prueba: ${
-                item.personaEvaluada?.resultadoPrimeraPruebaInicial ||
-                item.personaEvaluada?.gradoDetectadoMg100ml ||
-                "Sin dato"
-              }. Segunda prueba: ${
-                item.personaEvaluada?.resultadoSegundaPruebaConfirmatoria ||
-                item.personaEvaluada?.gradoDetectadoSegundaPruebaMg100ml ||
-                "Sin dato"
-              }.`
-            : "Resultados registrados como conformes.",
-        })),
+        detalles: resultados.map(({ item, positivo }) => {
+          const persona = item.personaEvaluada || {};
+          const describirPrueba = (resultado: unknown, grado: unknown) => {
+            const etiqueta = textoSeguro(resultado, "Sin resultado");
+            const valor = textoSeguro(grado, "Sin medición");
+            return `${etiqueta} (${valor} mg/100ml)`;
+          };
+
+          return {
+            grupo: "Resultado de pruebas",
+            item: textoSeguro(persona.nombre, "Persona evaluada"),
+            estado: positivo ? "Con novedad" : "Conforme",
+            observaciones: `Primera prueba: ${describirPrueba(
+              persona.resultadoPrimeraPruebaInicial,
+              persona.gradoDetectadoMg100ml
+            )}. Segunda prueba: ${describirPrueba(
+              persona.resultadoSegundaPruebaConfirmatoria,
+              persona.gradoDetectadoSegundaPruebaMg100ml
+            )}.`,
+          };
+        }),
         busqueda: unirBusqueda([
           codigo,
           nombreFormato(codigo),
@@ -350,24 +374,34 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
       const sedeArea = sedeAreaValida(registro.datosInspeccion?.sedeCentroTrabajo || item.identificacionExtintor?.ubicacion);
       const responsable = registro.datosInspeccion?.responsableInspeccion || registro.registro?.usuarioEmail || "-";
       const fecha = registro.registro?.fechaRegistro?.slice(0, 10) || registro.fechaRegistro?.slice(0, 10) || "-";
+      const identificadorExtintor = textoSeguro(item.identificacionExtintor?.numeroExtintor, "Sin número");
+      const ubicacionExtintor = textoSeguro(item.identificacionExtintor?.ubicacion, "Sin ubicación");
+      const grupoExtintor = `Extintor ${identificadorExtintor} · ${ubicacionExtintor}`;
       return {
         ...base,
         fecha,
         responsable,
         sedeArea,
-        estado: novedades > 0 ? "Con novedad" : regulares > 0 || vencimiento === "Próximo" ? "Regular" : "Conforme",
+        estado:
+          novedades > 0
+            ? "Con novedad"
+            : regulares > 0 || vencimiento === "Próximo"
+              ? "Regular"
+              : recarga.severidad === "pendiente"
+                ? "Pendiente"
+                : "Conforme",
         novedades,
         vencimiento,
         recarga,
         detalles: [
           ...verificacion.map((revision: any, revisionIndex: number) => ({
-            grupo: "Verificación del extintor",
+            grupo: grupoExtintor,
             item: textoSeguro(revision.criterio || revision.item || revision.descripcion, `Revisión ${revisionIndex + 1}`),
             estado: detalleEstadoCondicion(estadoRevisionId(revision)),
             observaciones: revision.observaciones,
           })),
           {
-            grupo: "Vencimiento",
+            grupo: `${grupoExtintor} · Recarga`,
             item: fechaProximaRecarga ? `Fecha próxima recarga: ${fechaProximaRecarga}` : "Fecha próxima recarga",
             estado: recarga.severidad === "malo" || recarga.severidad === "critico" ? "Con novedad" : recarga.severidad === "regular" ? "Regular" : recarga.severidad === "pendiente" ? "Pendiente" : "Conforme",
             observaciones: recarga.mensaje,
@@ -384,6 +418,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
       ...(registro.otros?.detalle || []),
     ];
     const novedades = items.filter((item: any) => item.estadoId === 2).length;
+    const pendientes = items.filter((item: any) => ![1, 2, 3].includes(item.estadoId)).length;
     const sedeArea = sedeAreaValida(registro.datosGenerales?.areaInspeccionada);
     const responsable = registro.datosGenerales?.inspector || registro.registro?.usuarioEmail || "-";
     const fecha = registro.datosGenerales?.fecha || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
@@ -393,7 +428,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
         fecha,
         responsable,
         sedeArea,
-        estado: novedades > 0 ? "Con novedad" : "Conforme",
+        estado: novedades > 0 ? "Con novedad" : pendientes > 0 ? "Pendiente" : "Conforme",
         novedades,
         detalles: items.map((item: any, itemIndex: number) => ({
           grupo: textoSeguro(item.grupoTitulo, "Condiciones de seguridad"),
@@ -537,11 +572,10 @@ export default async function FormatosPage({
     const coincideHasta = !rangoPeriodo.hasta || registro.fechaCreacion <= rangoPeriodo.hasta;
     return coincideBusqueda && coincideFormato && coincideEstado && coincideDesde && coincideHasta;
   };
-  const registrosFiltrados = registros.filter(filtrarRegistro);
   const inspeccionesMetricas = inspecciones.filter(filtrarRegistro);
-  const registrosRecientes = registrosFiltrados.slice(0, 10);
+  const registrosRecientes = inspeccionesMetricas.slice(0, 10);
   const mesActual = new Date().toISOString().slice(0, 7);
-  const totalInspecciones = inspecciones.length;
+  const totalInspecciones = inspeccionesMetricas.length;
   const inspeccionesMes = inspeccionesMetricas.filter((registro) => registro.fechaCreacion.startsWith(mesActual)).length;
   const conformes = inspeccionesMetricas.filter((registro) => registro.estado === "Conforme").length;
   const inspeccionesConNovedad = inspeccionesMetricas.filter((registro) => registro.estado === "Con novedad").length;

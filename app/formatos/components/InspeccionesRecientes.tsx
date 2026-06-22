@@ -76,10 +76,28 @@ const claseDetalle = (estado: string) => {
 
 const obtenerDetallePrincipal = (registro: RegistroModulo) => {
   if (registro.codigo === "HSE-F003" && registro.recarga) {
+    const tieneNovedadFueraDeRecarga =
+      registro.estado === "Con novedad" && !["malo", "critico"].includes(registro.recarga.severidad);
+
     return {
-      titulo: "Estado de próxima recarga",
-      descripcion: detalleConsultivoRecarga(registro) || registro.recarga.mensaje,
-      items: registro.detalles.filter((detalle) => detalle.grupo === "Vencimiento" || detalle.estado === "Regular" || detalle.estado === "Con novedad"),
+      titulo: tieneNovedadFueraDeRecarga ? "Novedades y estado de recarga" : "Estado de próxima recarga",
+      descripcion: tieneNovedadFueraDeRecarga
+        ? `Este formulario contiene ${registro.novedades} hallazgo${registro.novedades === 1 ? "" : "s"} en la verificación. ${registro.recarga.mensaje}`
+        : detalleConsultivoRecarga(registro) || registro.recarga.mensaje,
+      items: registro.detalles.filter(
+        (detalle) => detalle.grupo.includes("Recarga") || detalle.estado === "Regular" || detalle.estado === "Con novedad"
+      ),
+    };
+  }
+
+  if (registro.codigo === "HSE-F020" && registro.novedades > 0) {
+    return {
+      titulo: registro.estado === "Con novedad" ? "Resultados positivos encontrados" : "Resultados positivos dentro del registro",
+      descripcion:
+        registro.estado === "Con novedad"
+          ? `El estado general requiere revisión. Se encontraron ${registro.novedades} resultado${registro.novedades === 1 ? "" : "s"} positivo${registro.novedades === 1 ? "" : "s"}.`
+          : `El estado general se calculó por mayoría, pero se encontraron ${registro.novedades} resultado${registro.novedades === 1 ? "" : "s"} positivo${registro.novedades === 1 ? "" : "s"} que requieren revisión.`,
+      items: registro.detalles.filter((detalle) => detalle.estado === "Con novedad"),
     };
   }
 
@@ -147,7 +165,88 @@ export default function InspeccionesRecientes({ registros }: Props) {
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="text-lg font-bold text-slate-950">Inspecciones recientes</h2>
       </div>
-      <div className="overflow-x-auto">
+
+      <div className="divide-y divide-slate-100 md:hidden">
+        {registros.map((registro, index) => {
+          const IconoFormato = iconosFormato[registro.codigo as keyof typeof iconosFormato] || ClipboardCheck;
+          const horaRegistro = formatearHoraRegistro(registro.fechaCreacionMs);
+
+          return (
+            <article key={`mobile-${registro.codigo}-${registro.fecha}-${index}`} className="p-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#E8F5E9] text-[#006948]">
+                  <IconoFormato className="size-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-950">{registro.codigo}</p>
+                  <p className="mt-0.5 break-words text-sm font-medium leading-5 text-slate-500">{registro.formato}</p>
+                </div>
+              </div>
+
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-slate-50 p-3">
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Fecha</dt>
+                  <dd className="mt-1 text-xs font-semibold text-slate-700">
+                    {registro.fecha}
+                    {horaRegistro ? <span className="mt-0.5 block text-[11px] text-slate-500">{horaRegistro}</span> : null}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Sede / Área</dt>
+                  <dd className="mt-1 break-words text-xs font-semibold text-slate-700 [overflow-wrap:anywhere]">{registro.sedeArea}</dd>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Responsable / Inspector</dt>
+                  <dd className="mt-1 break-words text-xs font-semibold text-slate-700 [overflow-wrap:anywhere]">{registro.responsable}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Estado general</p>
+                  {registro.codigo === "HSE-F003" && registro.recarga ? (
+                    <div className="inline-flex flex-col items-start gap-1">
+                      <span className={`inline-flex justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                        {registro.estado}
+                      </span>
+                      <span className="text-[11px] font-semibold leading-tight text-slate-500">
+                        Recarga: {registro.recarga.estado} · {detalleCortoRecarga(registro)}
+                      </span>
+                    </div>
+                  ) : registro.codigo === "HSE-F020" && registro.novedades > 0 ? (
+                    <div className="inline-flex flex-col items-start gap-1">
+                      <span className={`inline-flex justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                        {registro.estado}
+                      </span>
+                      <span className="text-[11px] font-semibold leading-tight text-slate-500">
+                        {registro.novedades} resultado{registro.novedades === 1 ? "" : "s"} positivo{registro.novedades === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className={`inline-flex justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                      {registro.estado}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRegistroActivo(registro)}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-[#006948] hover:bg-[#E8F5E9] hover:text-[#006948]"
+                >
+                  <Eye className="size-4" aria-hidden="true" />
+                  Ver
+                </button>
+              </div>
+            </article>
+          );
+        })}
+
+        {registros.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm font-medium text-slate-500">Sin registros guardados</p>
+        ) : null}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-[1180px] w-full text-sm">
           <thead className="bg-white text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
             <tr>
@@ -198,10 +297,21 @@ export default function InspeccionesRecientes({ registros }: Props) {
                 <td className="px-5 py-4 text-center">
                   {registro.codigo === "HSE-F003" && registro.recarga ? (
                     <div className="inline-flex min-w-36 flex-col items-center gap-1">
-                      <span className={`inline-flex min-w-20 justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseRecarga(registro.recarga.severidad)}`}>
-                        {registro.recarga.estado}
+                      <span className={`inline-flex min-w-20 justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                        {registro.estado}
                       </span>
-                      <span className="text-center text-[11px] font-semibold leading-tight text-slate-500">{detalleCortoRecarga(registro)}</span>
+                      <span className="text-center text-[11px] font-semibold leading-tight text-slate-500">
+                        Recarga: {registro.recarga.estado} · {detalleCortoRecarga(registro)}
+                      </span>
+                    </div>
+                  ) : registro.codigo === "HSE-F020" && registro.novedades > 0 ? (
+                    <div className="inline-flex min-w-36 flex-col items-center gap-1">
+                      <span className={`inline-flex min-w-20 justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
+                        {registro.estado}
+                      </span>
+                      <span className="text-center text-[11px] font-semibold leading-tight text-slate-500">
+                        {registro.novedades} resultado{registro.novedades === 1 ? "" : "s"} positivo{registro.novedades === 1 ? "" : "s"}
+                      </span>
                     </div>
                   ) : (
                     <span className={`inline-flex min-w-28 justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${claseEstado(registro.estado)}`}>
@@ -259,7 +369,7 @@ export default function InspeccionesRecientes({ registros }: Props) {
                   ["Fecha", registroActivo.fecha],
                   ["Sede / Área", registroActivo.sedeArea],
                   ["Responsable", registroActivo.responsable],
-                  ["Estado", registroActivo.codigo === "HSE-F003" && registroActivo.recarga ? registroActivo.recarga.estado : registroActivo.estado],
+                  ["Estado general", registroActivo.estado],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
