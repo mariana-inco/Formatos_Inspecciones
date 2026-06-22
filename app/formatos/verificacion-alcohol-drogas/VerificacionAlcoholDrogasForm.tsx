@@ -147,6 +147,7 @@ export default function VerificacionAlcoholDrogasForm() {
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const [imagenInputKey, setImagenInputKey] = useState(0);
   const referenciaFirma = useRef<SignatureRef>(null);
+  const resultadoPositivoConfirmado = datos.resultadoSegundaPruebaConfirmatoria === "POSITIVO";
 
   const manejarCambio = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -163,12 +164,20 @@ export default function VerificacionAlcoholDrogasForm() {
             gradoDetectadoSegundaPrueba: "",
             imagenEvidenciaNombre: "",
             imagenEvidenciaUrl: "",
+            hayTestigo: "",
+            nombreTestigo: "",
+            cargoTestigo: "",
+            confirmar: "",
           }
         : {}),
       ...(campo === "resultadoSegundaPruebaConfirmatoria" && siguienteValor !== "POSITIVO"
         ? {
             imagenEvidenciaNombre: "",
             imagenEvidenciaUrl: "",
+            hayTestigo: "",
+            nombreTestigo: "",
+            cargoTestigo: "",
+            confirmar: "",
           }
         : {}),
     }));
@@ -196,6 +205,8 @@ export default function VerificacionAlcoholDrogasForm() {
   };
 
   const manejarRadio = (campo: "empresaPersonaEvaluada" | "hayTestigo", value: EmpresaPersona | RespuestaSiNo) => {
+    if (campo === "hayTestigo" && !resultadoPositivoConfirmado) return;
+
     setDatos((prev) => ({
       ...prev,
       [campo]: value,
@@ -309,10 +320,10 @@ export default function VerificacionAlcoholDrogasForm() {
     }
     if (datos.resultadoSegundaPruebaConfirmatoria === "POSITIVO" && !datos.imagenEvidenciaUrl) camposFaltantes.push("imagenEvidencia");
     if (!datos.firmaPersonaEvaluadaRegistrada) camposFaltantes.push("firmaPersonaEvaluada");
-    if (!datos.hayTestigo) camposFaltantes.push("hayTestigo");
-    if (datos.hayTestigo === "SI" && !datos.nombreTestigo) camposFaltantes.push("nombreTestigo");
-    if (datos.hayTestigo === "SI" && !datos.cargoTestigo) camposFaltantes.push("cargoTestigo");
-    if (datos.hayTestigo === "SI" && !datos.confirmar) camposFaltantes.push("confirmar");
+    if (resultadoPositivoConfirmado && !datos.hayTestigo) camposFaltantes.push("hayTestigo");
+    if (resultadoPositivoConfirmado && datos.hayTestigo === "SI" && !datos.nombreTestigo) camposFaltantes.push("nombreTestigo");
+    if (resultadoPositivoConfirmado && datos.hayTestigo === "SI" && !datos.cargoTestigo) camposFaltantes.push("cargoTestigo");
+    if (resultadoPositivoConfirmado && datos.hayTestigo === "SI" && !datos.confirmar) camposFaltantes.push("confirmar");
 
     return camposFaltantes;
   };
@@ -325,10 +336,20 @@ export default function VerificacionAlcoholDrogasForm() {
       return;
     }
 
+    const registroNormalizado: RegistroPersona = resultadoPositivoConfirmado
+      ? { ...datos }
+      : {
+          ...datos,
+          hayTestigo: "",
+          nombreTestigo: "",
+          cargoTestigo: "",
+          confirmar: "",
+        };
+
     if (indiceEdicion !== null) {
-      setRegistros((prev) => prev.map((registro, index) => (index === indiceEdicion ? { ...datos } : registro)));
+      setRegistros((prev) => prev.map((registro, index) => (index === indiceEdicion ? registroNormalizado : registro)));
     } else {
-      setRegistros((prev) => [...prev, { ...datos }]);
+      setRegistros((prev) => [...prev, registroNormalizado]);
     }
 
     limpiarRegistro();
@@ -770,22 +791,32 @@ export default function VerificacionAlcoholDrogasForm() {
                       <label
                         key={opcion}
                         className={`inline-flex min-w-28 items-center gap-3 rounded-2xl border px-5 py-3 transition ${
-                          datos.hayTestigo === opcion ? "border-emerald-800 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-600"
+                          !resultadoPositivoConfirmado
+                            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-70"
+                            : datos.hayTestigo === opcion
+                              ? "cursor-pointer border-emerald-800 bg-emerald-50 text-emerald-900"
+                              : "cursor-pointer border-slate-200 bg-white text-slate-600 hover:border-emerald-300"
                         }`}
                       >
                         <input
                           type="radio"
                           checked={datos.hayTestigo === opcion}
                           onChange={() => manejarRadio("hayTestigo", opcion)}
+                          disabled={!resultadoPositivoConfirmado}
                           className="size-5 accent-emerald-800"
                         />
                         {opcion}
                       </label>
                     ))}
                   </div>
+                  {!resultadoPositivoConfirmado ? (
+                    <p className="mt-2 text-xs font-medium text-slate-500">
+                      La selección de testigo se habilita únicamente cuando la segunda prueba confirmatoria es positiva.
+                    </p>
+                  ) : null}
                 </div>
 
-                {datos.hayTestigo === "SI" ? (
+                {resultadoPositivoConfirmado && datos.hayTestigo === "SI" ? (
                   <>
                     <div>
                       <label className={etiquetaCampo}>Nombre de testigo</label>
@@ -799,10 +830,12 @@ export default function VerificacionAlcoholDrogasForm() {
                   </>
                 ) : null}
 
-                <div className="md:col-span-2">
-                  <label className={etiquetaCampo}>Confirmar</label>
-                  <input name="confirmar" value={datos.confirmar} onChange={manejarCambio} className={campoTexto} />
-                </div>
+                {resultadoPositivoConfirmado && datos.hayTestigo === "SI" ? (
+                  <div className="md:col-span-2">
+                    <label className={etiquetaCampo}>Confirmar</label>
+                    <input name="confirmar" value={datos.confirmar} onChange={manejarCambio} className={campoTexto} />
+                  </div>
+                ) : null}
 
                 <div className="flex justify-center py-4 md:col-span-2">
                   <button

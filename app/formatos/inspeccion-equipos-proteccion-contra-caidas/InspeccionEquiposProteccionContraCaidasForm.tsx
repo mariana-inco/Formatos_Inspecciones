@@ -13,6 +13,7 @@ import {
   ClipboardList,
   HardHat,
   ImageUp,
+  Pencil,
   Settings,
   ShieldCheck,
   XCircle,
@@ -189,6 +190,9 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
   const [rolModalFirma, setRolModalFirma] = useState<"inspector" | "responsable" | null>(null);
   const [firmaTieneTrazo, setFirmaTieneTrazo] = useState(false);
   const referenciaFirma = useRef<SignatureRef>(null);
+  const referenciaFormularioEquipo = useRef<HTMLDivElement>(null);
+  const referenciaResumenEquipo = useRef<HTMLDivElement>(null);
+  const referenciaChecklist = useRef<HTMLDivElement>(null);
   const [firmas, setFirmas] = useState<DatosFirma>(firmasIniciales);
 
   const listaChequeoActual = useMemo(() => tiposInspeccion[tipoInspeccionSeleccionado].checklist || [], [tipoInspeccionSeleccionado]);
@@ -353,6 +357,16 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     }
 
     setDatosRegistrados(true);
+    window.requestAnimationFrame(() => {
+      referenciaResumenEquipo.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const editarDatosEquipo = () => {
+    setDatosRegistrados(false);
+    window.requestAnimationFrame(() => {
+      referenciaFormularioEquipo.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   const limpiarFirma = () => {
@@ -422,6 +436,16 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
     }
 
     setMostrarDatosAdicionales(true);
+    window.requestAnimationFrame(() => {
+      referenciaChecklist.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const editarRespuestasChecklist = () => {
+    setMostrarDatosAdicionales(false);
+    window.requestAnimationFrame(() => {
+      referenciaChecklist.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   const abrirModalFirma = (role: "inspector" | "responsable") => {
@@ -879,7 +903,7 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
 
         {!datosRegistrados ? (
           <>
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div ref={referenciaFormularioEquipo} className="scroll-mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="mb-6 border-b border-slate-200 pb-4">
                 <h2 className="text-lg font-bold text-slate-900">Registro del equipo</h2>
                 <p className="mt-1 text-sm text-slate-600">Complete la información básica antes de iniciar la inspección técnica.</p>
@@ -1043,12 +1067,26 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 En las casilla de CONCEPTO, escriba &quot;ACEPTADO&quot; o &quot;RECHAZADO&quot; y en la casilla COMENTARIOS haga las anotaciones específicas necesarias.
               </p>
               <p className="text-xs font-bold text-red-600">
-                IMPORTANTE: Antes de agregar datos, verifique cuidadosamente la información, ya que una vez ingresada no podrá ser modificada.
+                IMPORTANTE: Después de agregar los datos podrá revisarlos y editarlos antes de enviar el formulario.
               </p>
             </div>
           </>
         ) : (
-          <div>
+          <div ref={referenciaResumenEquipo} className="scroll-mt-6">
+            <div className="mt-6 flex flex-col gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-950">Datos del equipo registrados</h2>
+                <p className="mt-1 text-xs font-medium text-emerald-800">Revise la información antes de continuar con la inspección.</p>
+              </div>
+              <button
+                type="button"
+                onClick={editarDatosEquipo}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-emerald-700 bg-white px-5 py-2 text-xs font-bold uppercase tracking-wide text-emerald-800 transition hover:bg-emerald-100"
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+                Editar datos
+              </button>
+            </div>
             <div className="mt-6 overflow-hidden rounded-lg border bg-slate-50 p-4">
               <div className="grid gap-4 bg-emerald-900 px-4 py-3 text-white sm:grid-cols-[2fr_1fr]">
                 <div className="font-semibold uppercase">ELEMENTO O EQUIPO A INSPECCIONAR</div>
@@ -1101,13 +1139,13 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
                 En las casilla de CONCEPTO, escriba &quot;ACEPTADO&quot; o &quot;RECHAZADO&quot; y en la casilla COMENTARIOS haga las anotaciones específicas necesarias.
               </p>
               <p className="text-xs font-bold text-red-600">
-                IMPORTANTE: Antes de agregar datos, verifique cuidadosamente la información, ya que una vez ingresada no podrá ser modificada.
+                IMPORTANTE: Puede editar los datos registrados antes de enviar el formulario.
               </p>
             </div>
           </div>
         )}
 
-        <div className="mt-6 border-t border-slate-200 bg-slate-100 px-3 py-5 sm:px-6 sm:py-6">
+        <div ref={referenciaChecklist} className="mt-6 scroll-mt-6 border-t border-slate-200 bg-slate-100 px-3 py-5 sm:px-6 sm:py-6">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-5 border-l-4 border-emerald-700 pl-4">
               <h2 className="text-lg font-bold uppercase tracking-wide text-slate-950 sm:text-xl">{tiposInspeccion[tipoInspeccionSeleccionado].label}</h2>
@@ -1155,6 +1193,20 @@ export default function InspeccionEquiposProteccionContraCaidasForm() {
               </>
             ) : (
               <div className="mt-2">
+                <div className="mb-4 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-emerald-950">Checklist diligenciado</h3>
+                    <p className="mt-1 text-xs font-medium text-emerald-800">Revise las respuestas registradas antes de continuar.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={editarRespuestasChecklist}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-emerald-700 bg-white px-5 py-2 text-xs font-bold uppercase tracking-wide text-emerald-800 transition hover:bg-emerald-100"
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Editar respuestas
+                  </button>
+                </div>
                 {renderizarTablaListaChequeo({
                   items: listaChequeoActual,
                   mode: "adicional",

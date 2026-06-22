@@ -5,10 +5,10 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 px-6 py-10 sm:px-10">
       <div className="mx-auto max-w-4xl rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm sm:p-12">
         <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold uppercase tracking-[0.24em] text-emerald-900">
-          FORM_APP
+          INSPECCIONES HSE
         </span>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          Bienvenida a los formatos de inspección
+          Bienvenidos a los formatos de inspección
         </h1>
         <p className="mt-4 text-base leading-7 text-slate-600">
           En este repositorio se agrupan varios formatos de inspección. Navega al listado para seleccionar el formato que necesitas.
