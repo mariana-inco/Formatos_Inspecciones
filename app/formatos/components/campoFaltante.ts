@@ -63,7 +63,7 @@ const etiquetasCampo: Record<string, string> = {
   responsableFirma: "Firma del responsable",
 };
 
-const humanizarId = (id: string) =>
+const PersonId = (id: string) =>
   id
     .replace(/-\d+$/, "")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -80,7 +80,7 @@ const obtenerEtiquetaCampo = (id: string) => {
   if (id.startsWith("otroEstado-")) return "Estado de otros";
   if (id.startsWith("estado-")) return "Estado del ítem";
   if (id.startsWith("concepto-")) return "Concepto del ítem";
-  return humanizarId(id);
+  return PersonId(id);
 };
 
 export const enfocarYMostrarCampoFaltante = (id: string) => {

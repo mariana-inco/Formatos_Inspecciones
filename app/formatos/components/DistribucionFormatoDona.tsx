@@ -65,11 +65,15 @@ export default function DistribucionFormatoDona({ segmentos, total }: Props) {
               fill={item.color}
               tabIndex={0}
               aria-label={`${item.codigo} - ${item.nombreCorto}: ${item.value} registro${item.value === 1 ? "" : "s"} (${item.porcentaje}%)`}
-              onMouseEnter={() => setSegmentoActivo(item)}
+              onPointerEnter={() => setSegmentoActivo(item)}
+              onPointerDown={() => setSegmentoActivo(item)}
+              onClick={() => setSegmentoActivo(item)}
               onFocus={() => setSegmentoActivo(item)}
-              onMouseLeave={() => setSegmentoActivo(null)}
+              onPointerLeave={(evento) => {
+                if (evento.pointerType === "mouse") setSegmentoActivo(null);
+              }}
               onBlur={() => setSegmentoActivo(null)}
-              className="cursor-pointer outline-none transition duration-200 hover:brightness-95 hover:drop-shadow-md focus:brightness-95 focus:drop-shadow-md"
+              className="cursor-pointer touch-manipulation outline-none transition duration-200 hover:brightness-95 hover:drop-shadow-md focus:brightness-95 focus:drop-shadow-md"
             />
           ))}
         </svg>
