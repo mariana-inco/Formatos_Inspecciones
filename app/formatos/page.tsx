@@ -64,6 +64,7 @@ const fuentes = [
   { codigo: "HSE-F010", dir: "lista-chequeo-condiciones-seguridad", ruta: "/formatos/lista-chequeo-condiciones-seguridad" },
 ];
 const coloresDistribucion = ["#006948", "#20A37A", "#8BD7BD", "#B7E4C7", "#CBD5E1"];
+const ETIQUETA_SEDE_NO_DILIGENCIADA = "Sede / área no diligenciada";
 const iconosFormato = {
   "HSE-F006": ShieldCheck,
   "HSE-F002": HardHat,
@@ -77,7 +78,7 @@ const nombreFormato = (codigo: string) => formatos.find((formato) => formato.cod
 const contar = (items: string[]) =>
   Object.values(
     items.reduce<Record<string, { label: string; value: number }>>((acc, item) => {
-      const texto = item?.trim().replace(/\s+/g, " ") || "Sin sede/área registrada";
+      const texto = item?.trim().replace(/\s+/g, " ") || ETIQUETA_SEDE_NO_DILIGENCIADA;
       const key = texto.toLocaleLowerCase("es-CO");
       const label = texto.charAt(0).toLocaleUpperCase("es-CO") + texto.slice(1);
       acc[key] = acc[key] ? { ...acc[key], value: acc[key].value + 1 } : { label, value: 1 };
@@ -115,7 +116,7 @@ const leerJson = async (dir: string): Promise<RespuestaJsonModulo[]> => {
   }
 };
 
-const sedeAreaValida = (value?: string) => value?.trim() || "Sin sede/área registrada";
+const sedeAreaValida = (value?: string) => value?.trim() || ETIQUETA_SEDE_NO_DILIGENCIADA;
 const normalizarBusqueda = (value: string) =>
   value
     .normalize("NFD")
@@ -215,7 +216,7 @@ const mapearRegistro = (codigo: string, ruta: string, registro: RespuestaJsonMod
         observaciones: registro.cierreInspeccion?.comentariosFinales,
       },
     ];
-    const sedeArea = sedeAreaValida(registro.datosEquipo?.sedeArea || registro.formato?.area);
+    const sedeArea = sedeAreaValida(registro.datosEquipo?.sedeArea);
     const responsable = registro.registro?.usuarioEmail || "-";
     const fecha = registro.datosEquipo?.fechaInspeccion || registro.registro?.fechaRegistro?.slice(0, 10) || "-";
     const detalles = detallesChecklist.length > 0 ? detallesChecklist : detallesFallback;
@@ -589,6 +590,9 @@ export default async function FormatosPage({
     (registro) => registro.novedades
   );
   const porSedeAreaCompleto = contar(inspeccionesMetricas.map((registro) => registro.sedeArea));
+  const totalSedesRegistradas = porSedeAreaCompleto.filter(
+    (item) => normalizarBusqueda(item.label) !== normalizarBusqueda(ETIQUETA_SEDE_NO_DILIGENCIADA)
+  ).length;
   const porFormato = porFormatoCompleto.slice(0, 5);
   const novedadesPorFormato = novedadesPorFormatoCompleto.slice(0, 5);
   const porSedeArea = porSedeAreaCompleto.slice(0, 5);
@@ -851,7 +855,7 @@ export default async function FormatosPage({
                 iconBox: "bg-blue-50 text-blue-700",
                 pill: "bg-blue-50 text-blue-700",
                 bar: "bg-blue-500",
-                totalLabel: `${porSedeAreaCompleto.length} ${porSedeAreaCompleto.length === 1 ? "sede" : "sedes"}`,
+                totalLabel: `${totalSedesRegistradas} ${totalSedesRegistradas === 1 ? "sede" : "sedes"}`,
               },
             ].map((config) => {
               const visibles = config.items;
