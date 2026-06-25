@@ -16,10 +16,10 @@ export const formatos: Formato[] = [
   },
   {
     codigo: "HSE-F002",
-    nombre: "Inspeccion de EPP",
+    nombre: "Entrega de EPP",
     area: "Inspecciones",
     responsable: "Mariana Gomez",
-    ruta: "/formatos/inspeccion-epp",
+    ruta: "/formatos/entrega-epp",
   },
   {
     codigo: "HSE-F020",
