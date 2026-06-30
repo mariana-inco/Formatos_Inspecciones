@@ -161,12 +161,12 @@ export default function InspeccionesRecientes({ registros }: Props) {
   const detallesAgrupados = detallePrincipal ? agruparDetalles(detallePrincipal.items) : {};
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="text-lg font-bold text-slate-950">Inspecciones recientes</h2>
       </div>
 
-      <div className="divide-y divide-slate-100 md:hidden">
+      <div className="block divide-y divide-slate-100 md:hidden">
         {registros.map((registro, index) => {
           const IconoFormato = iconosFormato[registro.codigo as keyof typeof iconosFormato] || ClipboardCheck;
           const horaRegistro = formatearHoraRegistro(registro.fechaCreacionMs);
@@ -179,7 +179,7 @@ export default function InspeccionesRecientes({ registros }: Props) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-slate-950">{registro.codigo}</p>
-                  <p className="mt-0.5 break-words text-sm font-medium leading-5 text-slate-500">{registro.formato}</p>
+                  <p className="mt-0.5 wrap-break-word text-sm font-medium leading-5 text-slate-500">{registro.formato}</p>
                 </div>
               </div>
 
@@ -193,11 +193,11 @@ export default function InspeccionesRecientes({ registros }: Props) {
                 </div>
                 <div className="min-w-0">
                   <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Sede / Área</dt>
-                  <dd className="mt-1 break-words text-xs font-semibold text-slate-700 [overflow-wrap:anywhere]">{registro.sedeArea}</dd>
+                  <dd className="mt-1 wrap-anywhere text-xs font-semibold text-slate-700">{registro.sedeArea}</dd>
                 </div>
                 <div className="col-span-2 min-w-0">
                   <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Responsable / Inspector</dt>
-                  <dd className="mt-1 break-words text-xs font-semibold text-slate-700 [overflow-wrap:anywhere]">{registro.responsable}</dd>
+                  <dd className="mt-1 wrap-anywhere text-xs font-semibold text-slate-700">{registro.responsable}</dd>
                 </div>
               </dl>
 
@@ -246,8 +246,8 @@ export default function InspeccionesRecientes({ registros }: Props) {
         ) : null}
       </div>
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-[1180px] w-full text-sm">
+      <div className="hidden w-full max-w-full overflow-x-auto md:block">
+        <table className="w-full min-w-295 text-sm">
           <thead className="bg-white text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
             <tr>
               <th className="min-w-80 px-5 py-4">Formato</th>
@@ -284,14 +284,14 @@ export default function InspeccionesRecientes({ registros }: Props) {
                   </div>
                 </td>
                 <td className="px-5 py-4 font-medium text-slate-600">
-                  <span className="block min-w-0 break-words [overflow-wrap:anywhere]">{registro.sedeArea}</span>
+                  <span className="block min-w-0 wrap-anywhere">{registro.sedeArea}</span>
                 </td>
                 <td className="min-w-0 px-5 py-4">
                   <div className="flex items-center gap-3">
                     <div className="grid size-8 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
                       {registro.responsable.slice(0, 1).toUpperCase() || "H"}
                     </div>
-                    <span className="min-w-0 break-words font-medium text-slate-700 [overflow-wrap:anywhere]">{registro.responsable}</span>
+                    <span className="min-w-0 wrap-anywhere font-medium text-slate-700">{registro.responsable}</span>
                   </div>
                 </td>
                 <td className="px-5 py-4 text-center">
@@ -373,7 +373,7 @@ export default function InspeccionesRecientes({ registros }: Props) {
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-                    <p className="mt-2 min-w-0 break-words text-sm font-bold text-slate-950 [overflow-wrap:anywhere]">{value}</p>
+                    <p className="mt-2 min-w-0 wrap-anywhere text-sm font-bold text-slate-950">{value}</p>
                   </div>
                 ))}
               </div>

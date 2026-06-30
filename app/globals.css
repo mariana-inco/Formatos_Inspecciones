@@ -28,15 +28,15 @@ body {
 input,
 textarea,
 select {
-  color: #020617 !important;
-  -webkit-text-fill-color: #020617 !important;
+  color: #020617;
+  -webkit-text-fill-color: #020617;
   caret-color: #020617;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #64748b !important;
-  -webkit-text-fill-color: #64748b !important;
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
   opacity: 1;
 }
 
@@ -46,11 +46,11 @@ select:focus,
 input:not([type="file"]):focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  border-color: #10b981 !important;
-  outline: 2px solid transparent !important;
-  box-shadow: 0 0 0 3px rgb(209 250 229) !important;
-  --tw-ring-color: rgb(209 250 229) !important;
-  --tw-ring-shadow: 0 0 0 3px rgb(209 250 229) !important;
+  border-color: #10b981;
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px rgb(209 250 229);
+  --tw-ring-color: rgb(209 250 229);
+  --tw-ring-shadow: 0 0 0 3px rgb(209 250 229);
 }
 
 .date-input::-webkit-datetime-edit,

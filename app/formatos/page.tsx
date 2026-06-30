@@ -600,15 +600,15 @@ export default async function FormatosPage({
   const maxNovedades = Math.max(...novedadesPorFormato.map((item) => item.value), 1);
   const maxSedeArea = Math.max(...porSedeArea.map((item) => item.value), 1);
   const meses = Array.from({ length: 6 }, (_, index) => {
-    const fecha = new Date();
-    fecha.setMonth(fecha.getMonth() - (5 - index));
-    const key = fecha.toISOString().slice(0, 7);
+    const hoy = new Date();
+    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - (5 - index), 1);
+    const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
     const label = fecha.toLocaleDateString("es-CO", { month: "short" }).replace(".", "");
     return { key, label: label.charAt(0).toUpperCase() + label.slice(1) };
   });
   const tendencia = meses.map((mes) => {
     const registrosMes = inspeccionesMetricas.filter((registro) => registro.fechaCreacion.startsWith(mes.key));
-    return { mes: mes.label, realizadas: registrosMes.length, novedades: registrosMes.reduce((acc, registro) => acc + registro.novedades, 0) };
+    return { id: mes.key, mes: mes.label, realizadas: registrosMes.length, novedades: registrosMes.reduce((acc, registro) => acc + registro.novedades, 0) };
   });
   const maxTendencia = Math.max(...tendencia.flatMap((item) => [item.realizadas, item.novedades]), 1);
   const alturaMaximaBarra = 84;
@@ -776,7 +776,7 @@ export default async function FormatosPage({
                 <div className="mt-4 flex-1 overflow-x-auto rounded-lg border border-slate-100 bg-slate-50/60 px-4 pb-4 pt-5 sm:px-5">
                   <div className="flex h-full min-h-72 min-w-[520px] items-end justify-between gap-4 border-b border-slate-200">
                     {tendenciaVisual.map((item) => (
-                      <div key={item.mes} className="flex h-full min-w-0 flex-1 flex-col justify-end">
+                      <div key={item.id} className="flex h-full min-w-0 flex-1 flex-col justify-end">
                         <div className="flex flex-1 items-end justify-center gap-2">
                           {item.sinRegistros ? (
                             <div className="mb-0 flex w-full max-w-20 items-end justify-center rounded-t-lg bg-slate-200/80" style={{ height: `${alturaBarraSinDatos}%` }}>

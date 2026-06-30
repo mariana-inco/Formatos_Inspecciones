@@ -8,7 +8,7 @@ export default function Home() {
           INSPECCIONES HSE
         </span>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-          Bienvenidos a los formatos de inspección
+          Formatos de inspección
         </h1>
         <p className="mt-4 text-base leading-7 text-slate-600">
           En este repositorio se agrupan varios formatos de inspección. Navega al listado para seleccionar el formato que necesitas.
